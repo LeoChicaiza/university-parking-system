@@ -1,7 +1,12 @@
-
 server:
   port: 8081
 
 spring:
   application:
     name: entry-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
