@@ -1,6 +1,5 @@
-
 server:
-  port: 8084
+  port: 8085
 
 spring:
   application:
@@ -11,3 +10,17 @@ management:
     web:
       exposure:
         include: health,info
+
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: billing-group
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+

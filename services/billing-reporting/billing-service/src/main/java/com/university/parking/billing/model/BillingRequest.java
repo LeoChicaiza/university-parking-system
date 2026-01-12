@@ -1,14 +1,8 @@
-
 package com.university.parking.billing.model;
 
 public class BillingRequest {
-    private int minutesParked;
-
-    public int getMinutesParked() {
-        return minutesParked;
-    }
-
-    public void setMinutesParked(int minutesParked) {
-        this.minutesParked = minutesParked;
-    }
+    public String entryId;
+    public String plate;
+    public long entryTime;
+    public long exitTime;
 }

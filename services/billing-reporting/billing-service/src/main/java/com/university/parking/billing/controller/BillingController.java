@@ -1,8 +1,7 @@
-
 package com.university.parking.billing.controller;
 
+import com.university.parking.billing.model.BillingRecord;
 import com.university.parking.billing.model.BillingRequest;
-import com.university.parking.billing.model.BillingResponse;
 import com.university.parking.billing.service.BillingService;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,14 +9,14 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/billing")
 public class BillingController {
 
-    private final BillingService billingService;
+    private final BillingService service;
 
-    public BillingController(BillingService billingService) {
-        this.billingService = billingService;
+    public BillingController(BillingService service) {
+        this.service = service;
     }
 
-    @PostMapping
-    public BillingResponse generate(@RequestBody BillingRequest request) {
-        return billingService.calculate(request.getMinutesParked());
+    @PostMapping("/calculate")
+    public BillingRecord calculate(@RequestBody BillingRequest request) {
+        return service.calculate(request);
     }
 }
