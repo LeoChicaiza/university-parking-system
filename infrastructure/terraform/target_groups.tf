@@ -1,47 +1,59 @@
-# Target Group principal (root)
-resource "aws_lb_target_group" "main_tg" {
-  name     = "systemParking-tg"
+# SECURITY DOMAIN
+resource "aws_lb_target_group" "security_tg" {
+  name     = "security-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
+  vpc_id  = aws_vpc.main.id
 
   health_check {
-    path = "/"
+    path = "/actuator/health"
   }
 }
 
-# Entry Service
-resource "aws_lb_target_group" "entry_tg" {
-  name     = "entry-service-tg"
+# VEHICLE DOMAIN
+resource "aws_lb_target_group" "vehicle_tg" {
+  name     = "vehicle-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
+  vpc_id  = aws_vpc.main.id
 
   health_check {
-    path = "/api/entry"
+    path = "/actuator/health"
   }
 }
 
-# Exit Service
-resource "aws_lb_target_group" "exit_tg" {
-  name     = "exit-service-tg"
+# PARKING DOMAIN
+resource "aws_lb_target_group" "parking_tg" {
+  name     = "parking-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
+  vpc_id  = aws_vpc.main.id
 
   health_check {
-    path = "/api/exit"
+    path = "/actuator/health"
   }
 }
 
-# Parking Space Service
-resource "aws_lb_target_group" "parking_space_tg" {
-  name     = "parking-space-service-tg"
+# ACCESS DOMAIN
+resource "aws_lb_target_group" "access_tg" {
+  name     = "access-tg"
   port     = 80
   protocol = "HTTP"
-  vpc_id   = data.aws_vpc.default.id
+  vpc_id  = aws_vpc.main.id
 
   health_check {
-    path = "/api/parking-spaces"
+    path = "/actuator/health"
+  }
+}
+
+# BILLING DOMAIN
+resource "aws_lb_target_group" "billing_tg" {
+  name     = "billing-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id  = aws_vpc.main.id
+
+  health_check {
+    path = "/actuator/health"
   }
 }

@@ -1,35 +1,55 @@
-resource "aws_subnet" "alb" {
+# -------------------------
+# PUBLIC SUBNET - ALB
+# -------------------------
+resource "aws_subnet" "public_alb" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
+
+  tags = merge(local.common_tags, {
+    Name = "public-alb-${local.environment}"
+  })
 }
 
-resource "aws_subnet" "services" {
+# -------------------------
+# PUBLIC SUBNET - BASTION
+# -------------------------
+resource "aws_subnet" "public_bastion" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.2.0/24"
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
+
+  tags = merge(local.common_tags, {
+    Name = "public-bastion-${local.environment}"
+  })
 }
 
-resource "aws_subnet" "bastion" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.3.0/24"
-  availability_zone       = "us-east-1c"
-  map_public_ip_on_launch = true
+# -------------------------
+# PRIVATE SUBNET - SERVICES AZ1
+# -------------------------
+resource "aws_subnet" "private_az1" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.10.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = merge(local.common_tags, {
+    Name = "private-services-az1-${local.environment}"
+  })
 }
 
-resource "aws_route_table_association" "alb" {
-  subnet_id      = aws_subnet.alb.id
-  route_table_id = aws_route_table.public_rt.id
+# -------------------------
+# PRIVATE SUBNET - SERVICES AZ2
+# -------------------------
+resource "aws_subnet" "private_az2" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.11.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = merge(local.common_tags, {
+    Name = "private-services-az2-${local.environment}"
+  })
 }
 
-resource "aws_route_table_association" "services" {
-  subnet_id      = aws_subnet.services.id
-  route_table_id = aws_route_table.public_rt.id
-}
 
-resource "aws_route_table_association" "bastion" {
-  subnet_id      = aws_subnet.bastion.id
-  route_table_id = aws_route_table.public_rt.id
-}

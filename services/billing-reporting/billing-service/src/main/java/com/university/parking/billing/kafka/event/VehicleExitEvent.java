@@ -3,21 +3,21 @@ package com.university.parking.billing.kafka.event;
 public class VehicleExitEvent {
 
     private String plate;
-    private String exitTime;
+    private long exitTimeMillis;
 
     public VehicleExitEvent() {}
 
-    public VehicleExitEvent(String plate, String exitTime) {
+    public VehicleExitEvent(String plate, long exitTimeMillis) {
         this.plate = plate;
-        this.exitTime = exitTime;
+        this.exitTimeMillis = exitTimeMillis;
     }
 
     public String getPlate() {
         return plate;
     }
 
-    public String getExitTime() {
-        return exitTime;
+    public long getExitTimeMillis() {
+        return exitTimeMillis;
     }
 }
 

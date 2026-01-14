@@ -3,19 +3,17 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
   enable_dns_hostnames = true
 
-  tags = { Name = "systemParking-vpc" }
+  tags = merge(local.common_tags, {
+    Name = "parking-vpc-${local.environment}"
+  })
 }
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
+
+  tags = merge(local.common_tags, {
+    Name = "parking-igw-${local.environment}"
+  })
 }
 
-resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
-  }
-}
 

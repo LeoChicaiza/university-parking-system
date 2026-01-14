@@ -1,0 +1,9 @@
+CREATE TABLE vehicles (
+    plate VARCHAR(20) PRIMARY KEY,
+    brand VARCHAR(100) NOT NULL,
+    model VARCHAR(100) NOT NULL,
+    owner_email VARCHAR(255) NOT NULL
+);
+
+CREATE INDEX idx_vehicle_owner
+ON vehicles(owner_email);

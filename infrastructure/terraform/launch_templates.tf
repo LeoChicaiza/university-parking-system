@@ -1,51 +1,100 @@
-# Template principal
-resource "aws_launch_template" "main_lt" {
-  name_prefix   = "systemParking-"
+# =====================================================
+# SECURITY DOMAIN
+# =====================================================
+resource "aws_launch_template" "security_domain_lt" {
+  name_prefix   = "security-domain-"
   image_id      = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
+  key_name      = var.key_name
 
-  vpc_security_group_ids = [aws_security_group.instance_sg.id]
-
-  user_data = base64encode(templatefile("${path.module}/user_data.sh.tpl", {
-    docker_image = var.docker_image
-  }))
+  user_data = base64encode(templatefile(
+    "${path.module}/user_data_security_domain.sh.tpl",
+    {
+      auth_service_image = var.auth_service_image
+      user_service_image = var.user_service_image
+      dockerhub_user     = var.dockerhub_user
+      dockerhub_token    = var.dockerhub_token
+    }
+  ))
 }
 
-# Entry Service
-resource "aws_launch_template" "entry_lt" {
-  name_prefix   = "EntryService-"
+# =====================================================
+# VEHICLE DOMAIN
+# =====================================================
+resource "aws_launch_template" "vehicle_domain_lt" {
+  name_prefix   = "vehicle-domain-"
   image_id      = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
+  key_name      = var.key_name
 
-  vpc_security_group_ids = [aws_security_group.instance_sg.id]
-
-  user_data = base64encode(templatefile("${path.module}/user_data_entry.sh.tpl", {
-    docker_image = var.entry_service_image
-  }))
+  user_data = base64encode(templatefile(
+    "${path.module}/user_data_vehicle_domain.sh.tpl",
+    {
+      vehicle_service_image = var.vehicle_service_image
+      dockerhub_user        = var.dockerhub_user
+      dockerhub_token       = var.dockerhub_token
+    }
+  ))
 }
 
-# Exit Service
-resource "aws_launch_template" "exit_lt" {
-  name_prefix   = "ExitService-"
+# =====================================================
+# PARKING DOMAIN
+# =====================================================
+resource "aws_launch_template" "parking_domain_lt" {
+  name_prefix   = "parking-domain-"
   image_id      = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
+  key_name      = var.key_name
 
-  vpc_security_group_ids = [aws_security_group.instance_sg.id]
-
-  user_data = base64encode(templatefile("${path.module}/user_data_exit.sh.tpl", {
-    docker_image = var.exit_service_image
-  }))
+  user_data = base64encode(templatefile(
+    "${path.module}/user_data_parking_domain.sh.tpl",
+    {
+      parking_space_service_image = var.parking_space_service_image
+      parking_lot_service_image   = var.parking_lot_service_image
+      dockerhub_user              = var.dockerhub_user
+      dockerhub_token             = var.dockerhub_token
+    }
+  ))
 }
 
-# Parking Space Service
-resource "aws_launch_template" "parking_space_lt" {
-  name_prefix   = "ParkingSpaceService-"
+# =====================================================
+# ACCESS DOMAIN
+# =====================================================
+resource "aws_launch_template" "access_domain_lt" {
+  name_prefix   = "access-domain-"
   image_id      = data.aws_ami.amazon_linux.id
   instance_type = var.instance_type
+  key_name      = var.key_name
 
-  vpc_security_group_ids = [aws_security_group.instance_sg.id]
-
-  user_data = base64encode(templatefile("${path.module}/user_data_parking_space.sh.tpl", {
-    docker_image = var.parking_space_service_image
-  }))
+  user_data = base64encode(templatefile(
+    "${path.module}/user_data_access_domain.sh.tpl",
+    {
+      entry_service_image = var.entry_service_image
+      exit_service_image  = var.exit_service_image
+      dockerhub_user      = var.dockerhub_user
+      dockerhub_token     = var.dockerhub_token
+    }
+  ))
 }
+
+# =====================================================
+# BILLING DOMAIN
+# =====================================================
+resource "aws_launch_template" "billing_domain_lt" {
+  name_prefix   = "billing-domain-"
+  image_id      = data.aws_ami.amazon_linux.id
+  instance_type = var.instance_type
+  key_name      = var.key_name
+
+  user_data = base64encode(templatefile(
+    "${path.module}/user_data_billing_domain.sh.tpl",
+    {
+      billing_service_image      = var.billing_service_image
+      notification_service_image = var.notification_service_image
+      reporting_service_image    = var.reporting_service_image
+      dockerhub_user             = var.dockerhub_user
+      dockerhub_token            = var.dockerhub_token
+    }
+  ))
+}
+

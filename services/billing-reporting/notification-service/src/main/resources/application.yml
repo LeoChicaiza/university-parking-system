@@ -1,10 +1,26 @@
 
 server:
-  port: 8085
+  port: 8088
 
 spring:
   application:
     name: notification-service
+
+  datasource:
+    url: jdbc:postgresql://postgres-access:5432/access_domain_db
+    username: access_user
+    password: access_pass
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-group
+      auto-offset-reset: earliest
 
 management:
   endpoints:
@@ -12,18 +28,6 @@ management:
       exposure:
         include: health,info
 
-spring:
-  kafka:
-    bootstrap-servers: kafka:9092
 
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
-    consumer:
-      group-id: parking-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
+  

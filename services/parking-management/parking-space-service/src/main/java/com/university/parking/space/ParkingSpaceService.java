@@ -13,6 +13,9 @@ public class ParkingSpaceService {
         this.repository = repository;
     }
 
+    /**
+     * Asigna un espacio disponible en un lote
+     */
     public ParkingSpace assignSpace(String lotId) {
         ParkingSpace space = repository.findAvailableByLot(lotId)
                 .orElseThrow(() -> new RuntimeException("No available spaces"));
@@ -20,14 +23,32 @@ public class ParkingSpaceService {
         if (!space.occupy()) {
             throw new RuntimeException("Space already occupied");
         }
-        return space;
+
+        return repository.save(space);
     }
 
+    /**
+     * Libera un espacio de parqueo
+     */
     public void releaseSpace(String spaceId) {
         ParkingSpace space = repository.findById(spaceId)
                 .orElseThrow(() -> new RuntimeException("Space not found"));
+
         space.release();
+        repository.save(space);
     }
+
+    public void markOccupied(String spaceId) {
+        ParkingSpace space = repository.findById(spaceId)
+            .orElseThrow(() -> new RuntimeException("Space not found"));
+
+        if (!space.isOccupied()) {
+            space.occupy();
+            repository.save(space);
+        }
+    }
+
 }
+
 
 

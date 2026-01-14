@@ -1,0 +1,29 @@
+CREATE TABLE users (
+    email VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    active BOOLEAN NOT NULL
+);
+
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL
+);
+
+CREATE TABLE user_roles (
+    id SERIAL PRIMARY KEY,
+    user_email VARCHAR(255) NOT NULL,
+    role_id BIGINT NOT NULL,
+    CONSTRAINT fk_user FOREIGN KEY (user_email) REFERENCES users(email),
+    CONSTRAINT fk_role FOREIGN KEY (role_id) REFERENCES roles(id),
+    CONSTRAINT uq_user_role UNIQUE (user_email, role_id)
+);
+
+CREATE TABLE vehicles (
+    plate VARCHAR(20) PRIMARY KEY,
+    brand VARCHAR(100) NOT NULL,
+    model VARCHAR(100) NOT NULL,
+    owner_email VARCHAR(255) NOT NULL
+);
+
+CREATE INDEX idx_vehicle_owner
+ON vehicles(owner_email);

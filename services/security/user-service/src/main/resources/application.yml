@@ -1,12 +1,21 @@
 server:
-  port: 8086
+  port: 8081
 
 spring:
+  datasource:
+    url: jdbc:postgresql://postgres-core:5432/core_domain_db
+    username: core_user
+    password: core_pass
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
   application:
     name: user-service
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
