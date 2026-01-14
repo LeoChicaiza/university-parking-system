@@ -1,7 +1,22 @@
-
 server:
-  port: 8083
+  port: 8084
 
 spring:
   application:
     name: parking-space-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: parking-group
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
