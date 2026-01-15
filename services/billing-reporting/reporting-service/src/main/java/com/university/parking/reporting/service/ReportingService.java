@@ -1,19 +1,37 @@
-
 package com.university.parking.reporting.service;
 
-import com.university.parking.reporting.model.UsageReport;
+import com.university.parking.reporting.model.*;
+import com.university.parking.reporting.repository.*;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 
 @Service
 public class ReportingService {
 
-    public UsageReport generateReport() {
+    private final EntryReportRepository entryRepo;
+    private final ExitReportRepository exitRepo;
+    private final BillingReportRepository billingRepo;
 
-        // Simulated aggregated data
-        int entries = 120;
-        int exits = 115;
-        double revenue = 320.50;
+    public ReportingService(
+            EntryReportRepository entryRepo,
+            ExitReportRepository exitRepo,
+            BillingReportRepository billingRepo
+    ) {
+        this.entryRepo = entryRepo;
+        this.exitRepo = exitRepo;
+        this.billingRepo = billingRepo;
+    }
 
-        return new UsageReport(entries, exits, revenue);
+    public void registerEntry(String plate, LocalDateTime time) {
+        entryRepo.save(new EntryReport(plate, time));
+    }
+
+    public void registerExit(String plate, LocalDateTime time) {
+        exitRepo.save(new ExitReport(plate, time));
+    }
+
+    public void registerBilling(String plate, double amount) {
+        billingRepo.save(new BillingReport(plate, amount));
     }
 }

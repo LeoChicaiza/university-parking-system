@@ -1,49 +1,53 @@
 package com.university.parking.billing.service;
 
 import com.university.parking.billing.model.BillingRecord;
-import com.university.parking.billing.model.BillingRequest;
 import com.university.parking.billing.repository.BillingRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
 
 @Service
 public class BillingService {
 
-    private static final int FREE_MINUTES = 5;
-    private static final int BLOCK_MINUTES = 30;
-    private static final double BLOCK_PRICE = 0.50;
-    private static final double MAX_DAILY = 8.00;
-
     private final BillingRepository repository;
+    private final RestTemplate restTemplate;
 
-    public BillingService(BillingRepository repository) {
+    public BillingService(BillingRepository repository, RestTemplate restTemplate) {
         this.repository = repository;
+        this.restTemplate = restTemplate;
     }
 
-    public BillingRecord calculate(BillingRequest request) {
+    public BillingRecord processBilling(String plate, Long exitTime) {
 
-        long durationMillis = request.exitTime - request.entryTime;
-        long minutes = durationMillis / 60000;
-
-        if (minutes <= FREE_MINUTES) {
-            BillingRecord record =
-                    new BillingRecord(request.entryId, request.plate, minutes, 0.0);
-            return repository.save(record);
-        }
-
-        long billableMinutes = minutes - FREE_MINUTES;
-
-        long blocks = (long) Math.ceil(
-                (double) billableMinutes / BLOCK_MINUTES
+        // 1️⃣ Consultar entrada activa (ENTRY-SERVICE)
+        Map entry = restTemplate.getForObject(
+                "http://entry-service/entry/active/{plate}",
+                Map.class,
+                plate
         );
 
-        double amount = blocks * BLOCK_PRICE;
-
-        if (amount > MAX_DAILY) {
-            amount = MAX_DAILY;
+        if (entry == null || entry.get("entryTime") == null) {
+            throw new RuntimeException("Entry not found for billing");
         }
 
-        BillingRecord record =
-                new BillingRecord(request.entryId, request.plate, minutes, amount);
+        Long entryTime = ((Number) entry.get("entryTime")).longValue();
+
+        // 2️⃣ Calcular duración en minutos
+        long durationMinutes =
+                Math.max(1, (exitTime - entryTime) / (1000 * 60));
+
+        // 3️⃣ Calcular monto (regla simple académica)
+        double amount = durationMinutes * 0.05; // $0.05 por minuto
+
+        // 4️⃣ Persistir billing
+        BillingRecord record = new BillingRecord(
+                plate,
+                entryTime,
+                exitTime,
+                durationMinutes,
+                amount
+        );
 
         return repository.save(record);
     }

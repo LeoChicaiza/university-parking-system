@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "docker": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "deploy": {
+      "dependsOn": ["docker"],
+      "outputs": []
+    }
+  }
+}

@@ -1,36 +1,44 @@
 package com.university.parking.user.model;
 
+import jakarta.persistence.*;
+import java.util.UUID;
+
+@Entity
+@Table(name = "users", schema = "core_domain")
 public class User {
 
-    private String email;
-    private String name;
-    private String role;      // ADMIN, STUDENT, STAFF
-    private boolean active;
+    @Id
+    @GeneratedValue
+    private UUID id;
 
-    public User(String email, String name, String role) {
+    @Column(unique = true, nullable = false)
+    private String email;
+
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    private boolean active = true;
+
+    protected User() {}
+
+    public User(String email, String name, Role role) {
         this.email = email;
         this.name = name;
         this.role = role;
         this.active = true;
     }
 
-    public String getEmail() {
-        return email;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
+    public UUID getId() { return id; }
+    public String getEmail() { return email; }
+    public String getName() { return name; }
+    public Role getRole() { return role; }
+    public boolean isActive() { return active; }
 
     public void deactivate() {
         this.active = false;
     }
 }
+
+

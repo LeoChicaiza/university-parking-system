@@ -1,0 +1,44 @@
+name: Access Domain - DockerHub
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "services/access-management/**"
+      - "turbo.json"
+      - "package.json"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (Turborepo)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Turbo build (access domain)
+        run: npx turbo run build --filter=access-management...
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Entry Service
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/entry-service:latest ./services/access-management/entry-service
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/entry-service:latest
+
+      - name: Build & Push Exit Service
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/exit-service:latest ./services/access-management/exit-service
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/exit-service:latest

@@ -5,14 +5,17 @@ spring:
   application:
     name: vehicle-service
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+  datasource:
+    url: jdbc:postgresql://postgres-core:5432/core_domain_db
+    username: core_user
+    password: core_pass
+    driver-class-name: org.postgresql.Driver
 
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
 
-spring:
   kafka:
     bootstrap-servers: kafka:9092
 
@@ -27,3 +30,10 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+

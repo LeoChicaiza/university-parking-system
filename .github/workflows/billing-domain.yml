@@ -1,0 +1,44 @@
+name: Billing Domain - DockerHub
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "services/billing-management/**"
+      - "turbo.json"
+      - "package.json"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js (Turborepo)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Turbo build (billing domain)
+        run: npx turbo run build --filter=billing-management...
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Billing Service
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/billing-service:latest ./services/billing-management/billing-service
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/billing-service:latest
+
+      - name: Build & Push Notification Service
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest ./services/billing-management/notification-service
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest

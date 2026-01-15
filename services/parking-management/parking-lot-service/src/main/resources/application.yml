@@ -1,17 +1,20 @@
 server:
-  port: 8083
+  port: 8084
 
 spring:
   application:
     name: parking-lot-service
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
+  datasource:
+    url: jdbc:postgresql://postgres-core:5432/core_domain_db
+    username: core_user
+    password: core_pass
 
-spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
   kafka:
     bootstrap-servers: kafka:9092
 
@@ -26,3 +29,24 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+
+  redis:
+    host: redis
+    port: 6379
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+
+
+

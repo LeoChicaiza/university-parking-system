@@ -1,29 +1,15 @@
 package com.university.parking.entry.repository;
 
-import com.university.parking.entry.model.EntryRecord;
-import org.springframework.stereotype.Repository;
+import com.university.parking.entry.model.ParkingEntry;
+import com.university.parking.entry.model.EntryStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.*;
+import java.util.Optional;
+import java.util.UUID;
 
-@Repository
-public class EntryRepository {
+public interface EntryRepository extends JpaRepository<ParkingEntry, UUID> {
 
-    private final Map<String, EntryRecord> records = new HashMap<>();
-
-    public EntryRecord save(EntryRecord record) {
-        records.put(record.getEntryId(), record);
-        return record;
-    }
-
-    public Optional<EntryRecord> findActiveByPlate(String plate) {
-        return records.values().stream()
-                .filter(r -> r.getPlate().equals(plate))
-                .filter(EntryRecord::isActive)
-                .findFirst();
-    }
-
-    public Optional<EntryRecord> findById(String entryId) {
-        return Optional.ofNullable(records.get(entryId));
-    }
+    Optional<ParkingEntry> findByPlateAndStatus(String plate, EntryStatus status);
 }
+
 

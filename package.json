@@ -1,0 +1,29 @@
+{
+  "name": "university-parking-system",
+  "version": "1.0.0",
+  "description": "This repository contains the academic implementation of a distributed university parking system designed using a microservices-based architecture.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "docker": "turbo run docker",
+    "deploy": "turbo run deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeoChicaiza/university-parking-system.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/LeoChicaiza/university-parking-system/issues"
+  },
+  "homepage": "https://github.com/LeoChicaiza/university-parking-system#readme",
+  "devDependencies": {
+    "turbo": "^2.7.4"
+  }
+}
+

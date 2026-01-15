@@ -1,23 +1,29 @@
-
 package com.university.parking.notification.service;
 
-import com.university.parking.notification.model.NotificationRequest;
+import com.university.parking.notification.model.Notification;
+import com.university.parking.notification.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 
 @Service
 public class NotificationService {
 
-    public boolean send(NotificationRequest request) {
+    private final NotificationRepository repository;
 
-        if (request.getUserId() == null || request.getMessage() == null) {
-            return false;
-        }
+    public NotificationService(NotificationRepository repository) {
+        this.repository = repository;
+    }
 
-        // Simulated notification sending
-        System.out.println("Notification sent to user " + request.getUserId());
-        System.out.println("Type: " + request.getType());
-        System.out.println("Message: " + request.getMessage());
+    public void createBillingNotification(String plate, double amount) {
 
-        return true;
+        String message = "Billing generated for vehicle " + plate +
+                         " with amount $" + amount;
+
+        Notification notification =
+                new Notification(plate, amount, message);
+
+        repository.save(notification);
+
+        // Simulación académica
+        System.out.println("📨 NOTIFICATION SENT: " + message);
     }
 }
