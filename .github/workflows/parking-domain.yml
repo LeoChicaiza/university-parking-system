@@ -2,28 +2,43 @@ name: Parking Domain - DockerHub
 
 on:
   push:
-    paths:
-      - "parking-domain/**"
     branches: [ "main" ]
+    paths:
+      - "services/parking-management/**"
+      - "turbo.json"
+      - "package.json"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: docker/login-action@v3
+      - name: Setup Node.js (Turborepo)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Turbo build (parking domain)
+        run: npx turbo run build --filter=parking-management...
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & Push Parking Space Service
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest ./parking-domain/parking-space-service
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest ./services/parking-management/parking-space-service
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest
 
       - name: Build & Push Parking Lot Service
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest ./parking-domain/parking-lot-service
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest ./services/parking-management/parking-lot-service
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest

@@ -11,7 +11,7 @@ resource "aws_security_group" "bastion_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["157.100.140.8/32"]  
+    cidr_blocks = [var.allowed_ssh_cidr]  
   }
 
   # EGRESS: Permitir todo (sin referencia a otros SGs)

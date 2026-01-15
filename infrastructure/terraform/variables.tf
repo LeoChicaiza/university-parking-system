@@ -106,3 +106,91 @@ variable "reporting_service_image" {
   type        = string
 }
 
+# =====================================================
+# MULTI-ACCOUNT / ENVIRONMENT CONFIGURATION
+# =====================================================
+
+# -------------------------
+# ENVIRONMENT IDENTIFICATION
+# -------------------------
+variable "environment" {
+  description = "Environment name: 'qa' or 'prod'"
+  type        = string
+  default     = "qa"
+}
+
+variable "account_id" {
+  description = "12-digit AWS Account ID"
+  type        = string
+  default     = ""
+}
+
+# -------------------------
+# CROSS-ACCOUNT ACCESS (for PROD only)
+# -------------------------
+variable "assume_role_arn" {
+  description = "ARN of IAM Role for cross-account access (empty for QA)"
+  type        = string
+  default     = ""
+}
+
+# -------------------------
+# BACKEND CONFIGURATION
+# -------------------------
+variable "backend_bucket" {
+  description = "S3 bucket for Terraform state storage"
+  type        = string
+  default     = ""
+}
+
+# -------------------------
+# PROJECT METADATA
+# -------------------------
+variable "project_name" {
+  description = "Project name for resource tagging"
+  type        = string
+  default     = "UniversityParkingSystem"
+}
+
+# -------------------------
+# OPTIONAL ENVIRONMENT TWEAKS
+# -------------------------
+variable "bastion_instance_type" {
+  description = "EC2 instance type for bastion host"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "asg_min_size" {
+  description = "Minimum instances in Auto Scaling Groups"
+  type        = number
+  default     = 1
+}
+
+variable "asg_max_size" {
+  description = "Maximum instances in Auto Scaling Groups"
+  type        = number
+  default     = 2
+}
+
+# =====================================================
+# ADDITIONAL VARIABLES FOR ENVIRONMENTS.TF
+# =====================================================
+
+variable "owner" {
+  description = "Owner/team name for resource tagging"
+  type        = string
+  default     = "DevOps"
+}
+
+variable "allowed_ssh_cidr" {
+  description = "CIDR block allowed to SSH to bastion host"
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
+variable "aws_profile" {
+  description = "AWS CLI profile name"
+  type        = string
+  default     = "default"
+}

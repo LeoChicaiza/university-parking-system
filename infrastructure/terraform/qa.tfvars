@@ -1,4 +1,27 @@
 # ==========================
+# ENVIRONMENT & ACCOUNT
+# ==========================
+environment = "qa"
+account_id  = "506474937999"  # Tu cuenta actual de QA
+assume_role_arn = ""  # Vacío para QA (misma cuenta)
+
+# ==========================
+# BACKEND CONFIGURATION
+# ==========================
+backend_bucket = "terraform-state-qa-506474937999"
+aws_profile = "qa" 
+
+# ==========================
+# PROJECT METADATA
+# ==========================
+project_name = "UniversityParkingSystem"
+owner        = "DevOps"
+
+
+
+
+
+# ==========================
 # AWS
 # ==========================
 aws_region   = "us-east-1"

@@ -1,0 +1,9 @@
+{
+  "name": "parking-space-service",
+  "private": true,
+  "scripts": {
+    "build": "mvn clean package -DskipTests",
+    "docker": "docker build -t $IMAGE_NAME .",
+    "deploy": "echo Deploying parking-space-service"
+  }
+}

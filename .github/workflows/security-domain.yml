@@ -2,17 +2,30 @@ name: Security Domain - DockerHub
 
 on:
   push:
-    paths:
-      - "security-domain/**"
     branches: [ "main" ]
+    paths:
+      - "services/security/**"
+      - "turbo.json"
+      - "package.json"
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js (for Turborepo)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Turbo build (security domain)
+        run: npx turbo run build --filter=security...
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -22,10 +35,10 @@ jobs:
 
       - name: Build & Push Auth Service
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest ./security-domain/auth-service
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest ./services/security/auth-service
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest
 
       - name: Build & Push User Service
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest ./security-domain/user-service
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest ./services/security/user-service
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/user-service:latest
