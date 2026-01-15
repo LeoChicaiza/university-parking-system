@@ -32,7 +32,7 @@ key_name     = "parking-qa-key"
 # DockerHub
 # ==========================
 dockerhub_user  = "leochicaiza"
-dockerhub_token = "REPLACE_WITH_ENV_VAR"
+#dockerhub_token = "REPLACE_WITH_ENV_VAR"
 
 # ==========================
 # SECURITY DOMAIN
