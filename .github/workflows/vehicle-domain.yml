@@ -2,7 +2,7 @@ name: Vehicle Domain - DockerHub
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "QA" ]
     paths:
       - "services/vehicle/**"
       - "turbo.json"

@@ -2,7 +2,7 @@ name: Parking Domain - DockerHub
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "QA" ]
     paths:
       - "services/parking-management/**"
       - "turbo.json"
