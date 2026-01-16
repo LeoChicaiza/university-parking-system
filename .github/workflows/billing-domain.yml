@@ -2,7 +2,7 @@ name: Billing Domain - DockerHub
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "QA" ]
     paths:
       - "services/billing-management/**"
       - "turbo.json"
