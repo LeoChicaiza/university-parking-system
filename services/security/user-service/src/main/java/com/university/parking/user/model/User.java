@@ -30,15 +30,20 @@ public class User {
         this.active = true;
     }
 
+    // Getters
     public UUID getId() { return id; }
     public String getEmail() { return email; }
     public String getName() { return name; }
     public Role getRole() { return role; }
     public boolean isActive() { return active; }
 
+    // Setters mínimos necesarios para pruebas
+    public void setId(UUID id) { this.id = id; }
+    
+    // NO agregues setActive() si no lo necesitas en producción
+    // En su lugar, podemos usar deactivate() para cambiar el estado
+
     public void deactivate() {
         this.active = false;
     }
 }
-
-

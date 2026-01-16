@@ -1,44 +1,135 @@
-name: Parking Domain - DockerHub
+name: Parking Domain CI/CD
 
 on:
   push:
-    branches: [ "QA" ]
+    branches: [ "QA", "main" ]
     paths:
       - "services/parking-management/**"
-      - "turbo.json"
-      - "package.json"
+      - ".github/workflows/parking-domain.yml"
+  pull_request:
+    branches: [ "QA", "main" ]
+    paths:
+      - "services/parking-management/**"
 
 jobs:
-  build-and-push:
+  test:
     runs-on: ubuntu-latest
-
+    
+    strategy:
+      matrix:
+        service: [parking-lot-service, parking-space-service]
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js (Turborepo)
-        uses: actions/setup-node@v4
+      
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          node-version: 20
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      
+      - name: Run Maven tests for ${{ matrix.service }}
+        run: |
+          cd services/parking-management/${{ matrix.service }}
+          mvn clean test -B
+        shell: bash
+      
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.service }}
+          path: services/parking-management/${{ matrix.service }}/target/surefire-reports/
 
-      - name: Install dependencies
-        run: npm install
+  build-jars:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        service: [parking-lot-service, parking-space-service]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      
+      - name: Build JAR for ${{ matrix.service }}
+        run: |
+          cd services/parking-management/${{ matrix.service }}
+          mvn clean package -B -DskipTests
+      
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-${{ matrix.service }}
+          path: services/parking-management/${{ matrix.service }}/target/*.jar
 
-      - name: Turbo build (parking domain)
-        run: npx turbo run build --filter=parking-management...
-
+  build-and-push-docker:
+    needs: build-jars
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
+    
+    strategy:
+      matrix:
+        service: [parking-lot-service, parking-space-service]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push Docker image for ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: services/parking-management/${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build & Push Parking Space Service
+  deploy-notification:
+    needs: build-and-push-docker
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Deployment notification
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest ./services/parking-management/parking-space-service
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest
-
-      - name: Build & Push Parking Lot Service
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest ./services/parking-management/parking-lot-service
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest
+          echo "✅ Parking Domain deployment completed successfully!"
+          echo "Services deployed:"
+          echo "- parking-lot-service"
+          echo "- parking-space-service"
+          echo ""
+          echo "Docker images pushed to: ${{ secrets.DOCKERHUB_USERNAME }}"
+        shell: bash

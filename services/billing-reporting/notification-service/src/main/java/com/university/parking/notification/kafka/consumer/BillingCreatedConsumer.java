@@ -1,7 +1,7 @@
 package com.university.parking.notification.kafka.consumer;
 
 import com.university.parking.notification.service.NotificationService;
-import com.university.parking.billing.kafka.event.BillingCreatedEvent;
+import com.university.parking.notification.kafka.event.BillingCreatedEvent;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 

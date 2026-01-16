@@ -49,5 +49,9 @@ public class ParkingSpace {
     public String getId() {
         return id;
     }
+    
+    // Método adicional si necesitas
+    public boolean getAvailable() {
+        return !occupied;
+    }
 }
-

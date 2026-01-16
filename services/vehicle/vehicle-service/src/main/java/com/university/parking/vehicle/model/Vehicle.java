@@ -29,9 +29,17 @@ public class Vehicle {
         this.ownerEmail = ownerEmail;
     }
 
+    // Getters
     public UUID getId() { return id; }
     public String getPlate() { return plate; }
     public String getBrand() { return brand; }
     public String getModel() { return model; }
     public String getOwnerEmail() { return ownerEmail; }
+
+    // Setter necesario para pruebas
+    public void setId(UUID id) { 
+        this.id = id; 
+    }
+    
+    
 }

@@ -23,18 +23,19 @@ public class ParkingLotService {
     }
 
     public void occupy(String lotId) {
-
         String capacityKey = CAPACITY_KEY.formatted(lotId);
         String occupiedKey = OCCUPIED_KEY.formatted(lotId);
 
         // 1️⃣ Obtener valores desde Redis
-        int capacity = Integer.parseInt(
-                redisTemplate.opsForValue().get(capacityKey)
-        );
-
-        int occupied = Integer.parseInt(
-                redisTemplate.opsForValue().getOrDefault(occupiedKey, "0")
-        );
+        String capacityStr = redisTemplate.opsForValue().get(capacityKey);
+        String occupiedStr = redisTemplate.opsForValue().get(occupiedKey);
+        
+        if (capacityStr == null) {
+            throw new RuntimeException("Parking lot capacity not set in Redis");
+        }
+        
+        int capacity = Integer.parseInt(capacityStr);
+        int occupied = (occupiedStr != null) ? Integer.parseInt(occupiedStr) : 0;
 
         // 2️⃣ Validar disponibilidad
         if (occupied >= capacity) {
@@ -53,11 +54,15 @@ public class ParkingLotService {
     }
 
     public void release(String lotId) {
-
         String occupiedKey = OCCUPIED_KEY.formatted(lotId);
 
         // 1️⃣ Decrementar ocupación Redis
-        redisTemplate.opsForValue().decrement(occupiedKey);
+        Long newValue = redisTemplate.opsForValue().decrement(occupiedKey);
+        
+        // Si el valor es negativo, establecer a 0
+        if (newValue != null && newValue < 0) {
+            redisTemplate.opsForValue().set(occupiedKey, "0");
+        }
 
         // 2️⃣ (Opcional) Persistir en BD
         ParkingLot lot = repository.findById(lotId)

@@ -1,4 +1,4 @@
-package com.university.parking.space.config;
+package com.university.parking.exit.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
