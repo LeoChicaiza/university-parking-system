@@ -11,12 +11,6 @@ on:
     paths:
       - "services/vehicle/**"
 
-env:
-  # Variables de configuración
-  REGISTRY: docker.io
-  IMAGE_NAME: vehicle-service
-  MAVEN_OPTS: "-Dmaven.repo.local=${{ github.workspace }}/.m2/repository"
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -28,8 +22,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      
+      - name: Verify service directory exists
+        run: |
+          echo "Checking for ${{ matrix.service }}..."
+          if [ -d "services/vehicle/${{ matrix.service }}" ]; then
+            echo "✅ Directory exists: services/vehicle/${{ matrix.service }}"
+          else
+            echo "❌ Directory NOT FOUND: services/vehicle/${{ matrix.service }}"
+            exit 1
+          fi
       
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -41,34 +43,44 @@ jobs:
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ runner.os }}-maven-
       
-      - name: Run Maven tests for ${{ matrix.service }}
+      - name: Run Maven tests
         run: |
-          cd services/vehicle/${{ matrix.service }}
-          mvn clean test -B
-        shell: bash
-        env:
-          MAVEN_OPTS: "-Dmaven.test.failure.ignore=true"
+          echo "Running unit tests for ${{ matrix.service }}"
+          SERVICE_DIR="services/vehicle/${{ matrix.service }}"
+          
+          cd "$SERVICE_DIR"
+          echo "Current directory: $(pwd)"
+          
+          # Clean and compile first
+          mvn clean compile -B
+          
+          # Run tests
+          echo "=== Running Unit Tests ==="
+          mvn test -B
+          
+          echo "=== Test Results Summary ==="
+          if [ -d "target/surefire-reports" ]; then
+            find target/surefire-reports -name "*.txt" -exec echo "Test file: {}" \;
+          fi
       
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.service }}
-          path: |
-            services/vehicle/${{ matrix.service }}/target/surefire-reports/
-            services/vehicle/${{ matrix.service }}/target/failsafe-reports/
+          path: services/vehicle/${{ matrix.service }}/target/surefire-reports/
           retention-days: 7
       
-      - name: Upload JaCoCo coverage reports
+      - name: Upload test coverage
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-reports-${{ matrix.service }}
+          name: coverage-${{ matrix.service }}
           path: services/vehicle/${{ matrix.service }}/target/site/jacoco/
           retention-days: 7
 
@@ -94,24 +106,36 @@ jobs:
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ runner.os }}-maven-
       
-      - name: Build JAR for ${{ matrix.service }}
+      - name: Build JAR with Maven
         run: |
-          cd services/vehicle/${{ matrix.service }}
+          echo "=== Building JAR for ${{ matrix.service }} ==="
+          SERVICE_DIR="services/vehicle/${{ matrix.service }}"
+          
+          cd "$SERVICE_DIR"
+          echo "Current directory: $(pwd)"
+          
+          # Package the application (skip tests since they already passed)
           mvn clean package -B -DskipTests
-      
-      - name: Verify JAR creation
-        run: |
-          cd services/vehicle/${{ matrix.service }}
-          if [ -f "target/*.jar" ]; then
-            echo "✅ JAR file created successfully"
-            ls -la target/*.jar
+          
+          echo "=== Build Verification ==="
+          if [ -d "target" ]; then
+            echo "✅ Target directory created"
+            echo "JAR files:"
+            find target -name "*.jar" -type f
+            echo ""
+            echo "File sizes:"
+            ls -lh target/*.jar
+            
+            # Note the exact JAR name for Docker
+            JAR_FILE=$(find target -name "*.jar" -type f | head -1)
+            echo "EXACT_JAR_NAME=$(basename $JAR_FILE)" >> $GITHUB_ENV
           else
-            echo "❌ JAR file not found"
+            echo "❌ ERROR: Target directory not created!"
             exit 1
           fi
       
@@ -120,7 +144,7 @@ jobs:
         with:
           name: jar-${{ matrix.service }}
           path: services/vehicle/${{ matrix.service }}/target/*.jar
-          retention-days: 7
+          retention-days: 1
 
   security-scan:
     needs: test
@@ -157,7 +181,7 @@ jobs:
           retention-days: 30
 
   build-and-push-docker:
-    needs: [test, security-scan]
+    needs: [build-jars, security-scan]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
     
@@ -173,123 +197,149 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      
+      - name: Rebuild JAR (to ensure it exists in context)
+        run: |
+          echo "=== Rebuilding JAR for Docker context ==="
+          SERVICE_DIR="services/vehicle/${{ matrix.service }}"
+          
+          cd "$SERVICE_DIR"
+          echo "Current directory: $(pwd)"
+          
+          # Quick rebuild (skip tests since they already passed)
+          mvn clean package -B -DskipTests -q
+          
+          echo "=== Verifying JAR for Docker ==="
+          JAR_PATTERN="${{ matrix.service }}-*.jar"
+          JAR_FILE=$(find target -name "$JAR_PATTERN" -type f | head -1)
+          
+          if [ -n "$JAR_FILE" ]; then
+            echo "✅ Found JAR file: $JAR_FILE"
+            ls -lh "$JAR_FILE"
+            
+            # Guardar el nombre exacto para referencia
+            echo "EXACT_JAR_NAME=$(basename $JAR_FILE)" >> $GITHUB_ENV
+          else
+            echo "❌ ERROR: No JAR file found!"
+            echo "Looking for pattern: $JAR_PATTERN"
+            echo "Target directory contents:"
+            ls -la target/ || echo "No target directory"
+            exit 1
+          fi
+      
+      - name: Verify Dockerfile exists
+        run: |
+          echo "=== Checking Dockerfile ==="
+          DOCKERFILE="services/vehicle/${{ matrix.service }}/Dockerfile"
+          if [ -f "$DOCKERFILE" ]; then
+            echo "✅ Dockerfile exists"
+            echo "=== Dockerfile content ==="
+            cat "$DOCKERFILE"
+          else
+            echo "❌ ERROR: Dockerfile not found at $DOCKERFILE"
+            exit 1
+          fi
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-          buildkitd-flags: --debug
       
-      - name: Log in to Docker Hub
-        if: github.event_name != 'pull_request'
+      - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-,suffix={{date 'YYYYMMDD'}}
-      
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: services/vehicle/${{ matrix.service }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:v${{ github.run_number }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: false
       
-      - name: Verify Docker image
-        if: github.event_name != 'pull_request'
+      - name: Verify Docker image pushed
         run: |
-          echo "✅ Docker image built successfully"
-          echo "Image tags:"
-          echo "- ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest"
-          echo "- ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}"
-          echo "- ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:v${{ github.run_number }}"
+          echo "========================================="
+          echo "✅ VEHICLE DOMAIN - DOCKER IMAGE SUCCESSFULLY PUSHED!"
+          echo "📦 Service: ${{ matrix.service }}"
+          echo "🚗 Type: Vehicle Management Service"
+          echo "🏷️ Tags:"
+          echo "   - latest"
+          echo "   - ${{ github.sha }}"
+          echo "🐳 Registry: Docker Hub"
+          echo "👤 User: ${{ secrets.DOCKERHUB_USERNAME }}"
+          echo "🔗 URL: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}"
+          echo "========================================="
+
+  quality-gate:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Quality Gate Summary
+        run: |
+          echo "🚗 VEHICLE DOMAIN - QUALITY GATE REPORT"
+          echo "========================================"
+          echo ""
+          echo "✅ All tests passed for:"
+          echo "   • vehicle-service"
+          echo ""
+          echo "📊 Quality Metrics:"
+          echo "   - Vehicle management tests executed"
+          echo "   - Code compiled without errors"
+          echo "   - Ready for JAR generation"
+          echo ""
+          echo "🔒 Security scan queued"
+          echo "🚀 Ready for next pipeline stages!"
 
   deploy-notification:
-    needs: build-and-push-docker
+    needs: [build-and-push-docker, quality-gate]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: Send deployment notification
+      - name: Final deployment notification
         run: |
-          echo "🚀 Vehicle Domain deployment completed successfully!"
+          echo "🚀🚀🚀 VEHICLE DOMAIN - PRODUCTION DEPLOYMENT COMPLETED! 🚀🚀🚀"
           echo ""
-          echo "📦 Services deployed:"
-          echo "   - vehicle-service"
+          echo "🚗 VEHICLE MANAGEMENT SERVICE DEPLOYED"
+          echo "======================================="
           echo ""
-          echo "🐳 Docker images pushed to: ${{ secrets.DOCKERHUB_USERNAME }}"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:latest"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:${{ github.sha }}"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:v${{ github.run_number }}"
+          echo "📦 DOCKER IMAGES PUSHED TO DOCKER HUB:"
+          echo "   🚗 ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:latest"
+          echo "   🚗 ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:${{ github.sha }}"
           echo ""
-          echo "📊 Test reports and artifacts available in GitHub Actions"
-          echo "🔒 Security scan completed"
-        shell: bash
-      
-      - name: Create deployment summary
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const summary = `
-            # 🚀 Vehicle Domain Deployment Summary
-            
-            ## ✅ Status: Successfully Deployed
-            
-            ### 📦 Services
-            - **vehicle-service**: Microservice for vehicle management
-            
-            ### 🐳 Docker Images
-            Images pushed to Docker Hub:
-            - \`${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:latest\`
-            - \`${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:${{ github.sha }}\`
-            - \`${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:v${{ github.run_number }}\`
-            
-            ### 🧪 Quality Gates
-            - ✅ Unit tests passed
-            - ✅ Security scan completed
-            - ✅ Docker image built and pushed
-            
-            ### 📊 Artifacts Generated
-            1. Test reports
-            2. JAR files
-            3. Coverage reports (JaCoCo)
-            4. Security scan results
-            
-            ### 🔗 Links
-            - **Commit**: ${{ github.event.head_commit.url }}
-            - **Workflow**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            - **Docker Hub**: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service
-            
-            ---
-            *Deployment completed at: ${{ github.event.head_commit.timestamp }}*
-            `;
-            
-            // Create a comment on the commit
-            await github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-              body: summary
-            });
-            
-            console.log('Deployment summary created successfully!');
+          echo "✅ QUALITY & SECURITY CHECKS PASSED:"
+          echo "   • All unit tests executed and passed"
+          echo "   • Security scan completed (OWASP Dependency Check)"
+          echo "   • Code compilation successful"
+          echo "   • JAR files generated successfully"
+          echo "   • Docker images built without errors"
+          echo ""
+          echo "📊 ARTIFACTS AVAILABLE:"
+          echo "   • Test reports in GitHub Actions artifacts"
+          echo "   • Security scan reports"
+          echo "   • JAR files available for deployment"
+          echo "   • Docker images ready for container orchestration"
+          echo ""
+          echo "🔗 DOCKER HUB LINKS:"
+          echo "   • https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service"
+          echo ""
+          echo "🏁 READY FOR PRODUCTION DEPLOYMENT!"
