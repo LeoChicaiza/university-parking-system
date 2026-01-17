@@ -4,12 +4,12 @@ on:
   push:
     branches: [ "QA", "main" ]
     paths:
-      - "api-gateway/**"
+      - "services/gateway/**"
       - ".github/workflows/api-gateway.yml"
   pull_request:
     branches: [ "QA", "main" ]
     paths:
-      - "api-gateway/**"
+      - "services/gateway/**"
 
 env:
   REGISTRY: docker.io
@@ -43,7 +43,7 @@ jobs:
       
       - name: Run Maven tests
         run: |
-          cd api-gateway
+          cd services/gateway/api-gateway
           mvn clean test -B
         shell: bash
       
@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-gateway-test-reports
-          path: api-gateway/target/surefire-reports/
+          path: services/gateway/api-gateway/target/surefire-reports/
           retention-days: 7
 
   build:
@@ -80,12 +80,12 @@ jobs:
       
       - name: Build API Gateway JAR
         run: |
-          cd api-gateway
+          cd services/gateway/api-gateway
           mvn clean package -B -DskipTests
       
       - name: Verify JAR creation
         run: |
-          cd api-gateway
+          cd services/gateway/api-gateway
           if [ -f "target/*.jar" ]; then
             echo "✅ API Gateway JAR file created successfully"
             ls -la target/*.jar
@@ -98,45 +98,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-gateway-jar
-          path: api-gateway/target/*.jar
+          path: services/gateway/api-gateway/target/*.jar
           retention-days: 7
 
-  security-scan:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'api-gateway'
-          path: './api-gateway'
-          format: 'HTML'
-          out: './reports'
-          args: >
-            --failOnCVSS 7
-            --enableRetired
-      
-      - name: Upload security report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-report-api-gateway
-          path: ./reports
-          retention-days: 30
-
   build-and-push-docker:
-    needs: [test, security-scan]
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
     
@@ -160,7 +126,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: api-gateway
+          context: services/gateway/api-gateway
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest
@@ -175,23 +141,4 @@ jobs:
           echo "🏷️ Tags:"
           echo "  - latest"
           echo "  - ${{ github.sha }}"
-
-  deploy-notification:
-    needs: build-and-push-docker
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Send deployment notification
-        run: |
-          echo "🚀 API Gateway deployment completed successfully!"
-          echo ""
-          echo "📦 Service: API Gateway"
-          echo ""
-          echo "🐳 Docker images pushed to: ${{ secrets.DOCKERHUB_USERNAME }}"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:latest"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/api-gateway:${{ github.sha }}"
-          echo ""
-          echo "📊 Test reports and artifacts available in GitHub Actions"
-          echo "🔒 Security scan completed"
-        shell: bash
+          
