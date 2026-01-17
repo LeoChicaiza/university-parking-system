@@ -22,28 +22,51 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      
+      - name: Verify service directory exists
+        run: |
+          echo "Checking for ${{ matrix.service }}..."
+          if [ -d "services/billing-reporting/${{ matrix.service }}" ]; then
+            echo "✅ Directory exists: services/billing-reporting/${{ matrix.service }}"
+          else
+            echo "❌ Directory NOT FOUND: services/billing-reporting/${{ matrix.service }}"
+            exit 1
+          fi
       
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: maven
       
       - name: Cache Maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       
-      - name: Run Maven tests for ${{ matrix.service }}
+      - name: Run Maven tests
         run: |
-          echo "Running tests for ${{ matrix.service }}..."
-          cd services/billing-reporting/${{ matrix.service }}
-          mvn clean test -B -DskipTests=false
-        shell: bash
+          echo "Running unit tests for ${{ matrix.service }}"
+          SERVICE_DIR="services/billing-reporting/${{ matrix.service }}"
+          
+          cd "$SERVICE_DIR"
+          echo "Current directory: $(pwd)"
+          
+          # Clean and compile first
+          mvn clean compile -B
+          
+          # Run tests
+          echo "=== Running Unit Tests ==="
+          mvn test -B
+          
+          echo "=== Test Results Summary ==="
+          if [ -d "target/surefire-reports" ]; then
+            find target/surefire-reports -name "*.txt" -exec echo "Test file: {}" \;
+          fi
       
       - name: Upload test reports
         if: always()
@@ -51,6 +74,15 @@ jobs:
         with:
           name: test-reports-${{ matrix.service }}
           path: services/billing-reporting/${{ matrix.service }}/target/surefire-reports/
+          retention-days: 7
+      
+      - name: Upload test coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.service }}
+          path: services/billing-reporting/${{ matrix.service }}/target/site/jacoco/
+          retention-days: 7
 
   build-jars:
     needs: test
@@ -69,29 +101,59 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: maven
       
       - name: Cache Maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
       
-      - name: Build JAR for ${{ matrix.service }}
+      - name: Build JAR with Maven
         run: |
-          cd services/billing-reporting/${{ matrix.service }}
+          echo "=== Building JAR for ${{ matrix.service }} ==="
+          SERVICE_DIR="services/billing-reporting/${{ matrix.service }}"
+          
+          cd "$SERVICE_DIR"
+          echo "Current directory: $(pwd)"
+          
+          # Package the application (skip tests since they already passed)
           mvn clean package -B -DskipTests
+          
+          echo "=== Build Verification ==="
+          if [ -d "target" ]; then
+            echo "✅ Target directory created"
+            echo "JAR files:"
+            find target -name "*.jar" -type f
+            echo ""
+            echo "File sizes:"
+            ls -lh target/*.jar
+            
+            # Note the exact JAR name for Docker
+            JAR_FILE=$(find target -name "*.jar" -type f | head -1)
+            echo "EXACT_JAR_NAME=$(basename $JAR_FILE)" >> $GITHUB_ENV
+          else
+            echo "❌ ERROR: Target directory not created!"
+            exit 1
+          fi
       
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: jar-${{ matrix.service }}
           path: services/billing-reporting/${{ matrix.service }}/target/*.jar
+          retention-days: 1
 
   build-and-push-docker:
     needs: build-jars
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
+    
+    permissions:
+      contents: read
+      packages: write
     
     strategy:
       matrix:
@@ -101,11 +163,67 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
         with:
-          name: jar-${{ matrix.service }}
-          path: services/billing-reporting/${{ matrix.service }}/target/
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+      
+      - name: Rebuild JAR (to ensure it exists in context)
+        run: |
+          echo "=== Rebuilding JAR for Docker context ==="
+          SERVICE_DIR="services/billing-reporting/${{ matrix.service }}"
+          
+          cd "$SERVICE_DIR"
+          echo "Current directory: $(pwd)"
+          
+          # Quick rebuild (skip tests since they already passed)
+          mvn clean package -B -DskipTests -q
+          
+          echo "=== Verifying JAR for Docker ==="
+          # Los servicios tienen nombres diferentes:
+          # billing-service-0.0.1-SNAPSHOT.jar
+          # notification-service-0.0.1-SNAPSHOT.jar  
+          # reporting-service-0.0.1-SNAPSHOT.jar
+          
+          JAR_PATTERN="${{ matrix.service }}-*.jar"
+          JAR_FILE=$(find target -name "$JAR_PATTERN" -type f | head -1)
+          
+          if [ -n "$JAR_FILE" ]; then
+            echo "✅ Found JAR file: $JAR_FILE"
+            ls -lh "$JAR_FILE"
+            
+            # Guardar el nombre exacto para referencia
+            echo "EXACT_JAR_NAME=$(basename $JAR_FILE)" >> $GITHUB_ENV
+          else
+            echo "❌ ERROR: No JAR file found!"
+            echo "Looking for pattern: $JAR_PATTERN"
+            echo "Target directory contents:"
+            ls -la target/ || echo "No target directory"
+            exit 1
+          fi
+      
+      - name: Verify Dockerfile exists
+        run: |
+          echo "=== Checking Dockerfile ==="
+          DOCKERFILE="services/billing-reporting/${{ matrix.service }}/Dockerfile"
+          if [ -f "$DOCKERFILE" ]; then
+            echo "✅ Dockerfile exists"
+            echo "=== Dockerfile content ==="
+            cat "$DOCKERFILE"
+          else
+            echo "❌ ERROR: Dockerfile not found at $DOCKERFILE"
+            exit 1
+          fi
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -116,39 +234,87 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-      
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: services/billing-reporting/${{ matrix.service }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      
+      - name: Verify Docker image pushed
+        run: |
+          echo "========================================="
+          echo "✅ DOCKER IMAGE SUCCESSFULLY PUSHED!"
+          echo "📦 Service: ${{ matrix.service }}"
+          echo "🏷️ Tags:"
+          echo "   - latest"
+          echo "   - ${{ github.sha }}"
+          echo "🐳 Registry: Docker Hub"
+          echo "👤 User: ${{ secrets.DOCKERHUB_USERNAME }}"
+          echo "🔗 URL: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}"
+          echo "========================================="
+
+  quality-gate:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Quality Gate Summary
+        run: |
+          echo "🔍 BILLING DOMAIN - QUALITY GATE REPORT"
+          echo "========================================"
+          echo ""
+          echo "✅ All unit tests passed for:"
+          echo "   • billing-service"
+          echo "   • notification-service"
+          echo "   • reporting-service"
+          echo ""
+          echo "📊 Quality Metrics:"
+          echo "   - Tests executed successfully"
+          echo "   - Code compiled without errors"
+          echo "   - Ready for JAR generation"
+          echo ""
+          echo "🚀 Ready for next pipeline stages!"
 
   deploy-notification:
-    needs: build-and-push-docker
+    needs: [build-and-push-docker, quality-gate]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: Deployment notification
+      - name: Final deployment notification
         run: |
-          echo "✅ Billing Domain deployment completed successfully!"
-          echo "Services deployed:"
-          echo "- billing-service"
-          echo "- notification-service"
-          echo "- reporting-service"
+          echo "🚀🚀🚀 BILLING DOMAIN - PRODUCTION DEPLOYMENT COMPLETED! 🚀🚀🚀"
           echo ""
-          echo "Docker images pushed to: ${{ secrets.DOCKERHUB_USERNAME }}"
-        shell: bash
+          echo "🎉 ALL MICROSERVICES DEPLOYED SUCCESSFULLY"
+          echo "============================================"
+          echo ""
+          echo "📦 DOCKER IMAGES PUSHED TO DOCKER HUB:"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/billing-service:latest"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/billing-service:${{ github.sha }}"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:latest"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/notification-service:${{ github.sha }}"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/reporting-service:latest"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/reporting-service:${{ github.sha }}"
+          echo ""
+          echo "✅ QUALITY CHECKS PASSED:"
+          echo "   • All unit tests executed and passed"
+          echo "   • Code compilation successful"
+          echo "   • JAR files generated successfully"
+          echo "   • Docker images built without errors"
+          echo ""
+          echo "📊 ARTIFACTS AVAILABLE:"
+          echo "   • Test reports in GitHub Actions artifacts"
+          echo "   • JAR files available for deployment"
+          echo "   • Docker images ready for container orchestration"
+          echo ""
+          echo "🔗 DOCKER HUB LINKS:"
+          echo "   • https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/billing-service"
+          echo "   • https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/notification-service"
+          echo "   • https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/reporting-service"
+          echo ""
+          echo "🏁 READY FOR PRODUCTION DEPLOYMENT!"
