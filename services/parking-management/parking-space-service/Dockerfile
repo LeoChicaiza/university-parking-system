@@ -1,3 +1,3 @@
 FROM eclipse-temurin:17-jdk-alpine
-COPY target/parking-space-service.jar app.jar
+COPY target/parking-space-service-1.0.0.jar app.jar
 ENTRYPOINT ["java","-jar","/app.jar"]
