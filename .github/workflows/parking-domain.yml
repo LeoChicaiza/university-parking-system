@@ -11,9 +11,6 @@ on:
     paths:
       - "services/parking-management/**"
 
-env:
-  MAVEN_OPTS: "-Dmaven.repo.local=${{ github.workspace }}/.m2/repository"
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -36,16 +33,15 @@ jobs:
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ runner.os }}-maven-
       
       - name: Run Maven tests for ${{ matrix.service }}
         run: |
           cd services/parking-management/${{ matrix.service }}
           mvn clean test -B
-        shell: bash
       
       - name: Upload test reports
         if: always()
@@ -55,9 +51,15 @@ jobs:
           path: services/parking-management/${{ matrix.service }}/target/surefire-reports/
           retention-days: 7
 
-  build-jars:
+  build-and-push-docker:
     needs: test
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
+    
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     
     strategy:
       matrix:
@@ -77,74 +79,53 @@ jobs:
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-m2-
+            ${{ runner.os }}-maven-
       
-      - name: Build JAR for ${{ matrix.service }}
+      - name: Debug - Show project structure
         run: |
-          cd services/parking-management/${{ matrix.service }}
-          mvn clean package -B -DskipTests
-      
-      - name: Verify JAR creation for ${{ matrix.service }}
-        run: |
-          cd services/parking-management/${{ matrix.service }}
-          echo "=== JAR files for ${{ matrix.service }} ==="
-          ls -la target/*.jar || echo "No JAR files found"
+          echo "=== Project Structure ==="
+          find . -name "*.xml" -type f | head -10
           echo ""
-          echo "=== Target directory ==="
-          ls -la target/ || echo "Target directory doesn't exist"
+          echo "=== Services directory ==="
+          ls -la services/parking-management/
+          echo ""
+          echo "=== Service directory for ${{ matrix.service }} ==="
+          ls -la services/parking-management/${{ matrix.service }}/
       
-      - name: Upload JAR artifact for ${{ matrix.service }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: services/parking-management/${{ matrix.service }}
-          retention-days: 7
-
-  build-and-push-docker:
-    needs: build-jars
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
-    
-    permissions:
-      contents: read
-      packages: write
-    
-    strategy:
-      matrix:
-        service: [parking-lot-service, parking-space-service]
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Download JAR artifact for ${{ matrix.service }}
-        uses: actions/download-artifact@v4
-        with:
-          name: jar-${{ matrix.service }}
-          path: .
-      
-      - name: Prepare JAR files for Docker build
+      - name: Build with Maven
         run: |
-          echo "=== Preparing files for ${{ matrix.service }} ==="
+          echo "=== Building ${{ matrix.service }} ==="
+          cd services/parking-management/${{ matrix.service }}
           
-          # Mover el servicio descargado a la ubicación correcta
-          if [ -d "${{ matrix.service }}" ]; then
-            echo "Moving ${{ matrix.service }} to services/parking-management/"
-            mkdir -p services/parking-management/
-            mv "${{ matrix.service }}" services/parking-management/
+          # First, build the parent project if needed
+          if [ -f "../../../pom.xml" ]; then
+            echo "Building parent project first..."
+            cd ../../../
+            mvn clean install -DskipTests -pl services/parking-management/${{ matrix.service }} -am
+          else
+            # Build only this module
+            cd services/parking-management/${{ matrix.service }}
+            mvn clean package -B -DskipTests
           fi
-          
-          # Verificar la estructura final
-          echo ""
-          echo "=== Final structure ==="
-          echo "Checking: services/parking-management/${{ matrix.service }}/"
-          ls -la services/parking-management/${{ matrix.service }}/ || echo "Directory not found"
-          echo ""
-          echo "Checking JAR file:"
-          find services/parking-management/${{ matrix.service }} -name "*.jar" -type f || echo "JAR not found"
+      
+      - name: Verify JAR file exists
+        run: |
+          echo "=== Verifying JAR for ${{ matrix.service }} ==="
+          JAR_PATH="services/parking-management/${{ matrix.service }}/target"
+          if [ -d "$JAR_PATH" ]; then
+            echo "Target directory exists at: $JAR_PATH"
+            ls -la "$JAR_PATH/"
+            echo ""
+            echo "JAR files:"
+            find "$JAR_PATH" -name "*.jar" -type f
+          else
+            echo "ERROR: Target directory not found at: $JAR_PATH"
+            echo "Current directory: $(pwd)"
+            find . -name "target" -type d | head -10
+          fi
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -155,24 +136,25 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Build and push Docker image for ${{ matrix.service }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: services/parking-management/${{ matrix.service }}
+          file: services/parking-management/${{ matrix.service }}/Dockerfile
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            JAR_FILE=target/parking-lot-service-1.0.0.jar
       
-      - name: Verify Docker image for ${{ matrix.service }}
+      - name: Verify Docker image
         run: |
-          echo "✅ ${{ matrix.service }} Docker image built and pushed successfully"
-          echo "📦 Image: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}"
-          echo "🏷️ Tags:"
-          echo "  - latest"
-          echo "  - ${{ github.sha }}"
+          echo "✅ ${{ matrix.service }} Docker image built and pushed successfully!"
+          echo "📦 Repository: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service }}"
+          echo "🏷️ Tags: latest, ${{ github.sha }}"
 
   deploy-notification:
     needs: build-and-push-docker
@@ -180,19 +162,20 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
     steps:
-      - name: Deployment notification
+      - name: Send deployment notification
         run: |
-          echo "🚀 Parking Domain deployment completed successfully!"
+          echo "🚀 DEPLOYMENT COMPLETED SUCCESSFULLY!"
           echo ""
-          echo "📦 Services deployed:"
-          echo "- parking-lot-service"
-          echo "- parking-space-service"
+          echo "📦 Microservices deployed:"
+          echo "   • parking-lot-service"
+          echo "   • parking-space-service"
           echo ""
-          echo "🐳 Docker images pushed to: ${{ secrets.DOCKERHUB_USERNAME }}"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:${{ github.sha }}"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest"
-          echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:${{ github.sha }}"
+          echo "🐳 Docker Images:"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:latest"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/parking-lot-service:${{ github.sha }}"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest"
+          echo "   • ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:${{ github.sha }}"
           echo ""
-          echo "Test reports and artifacts available in GitHub Actions"
-        shell: bash
+          echo "✅ All tests passed"
+          echo "✅ All images built and pushed"
+          echo "✅ Ready for deployment!"
