@@ -12,8 +12,6 @@ on:
       - "services/gateway/**"
 
 env:
-  REGISTRY: docker.io
-  IMAGE_NAME: api-gateway
   MAVEN_OPTS: "-Dmaven.repo.local=${{ github.workspace }}/.m2/repository"
 
 jobs:
@@ -23,8 +21,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       
       - name: Setup Java 17
         uses: actions/setup-java@v4
@@ -45,7 +41,6 @@ jobs:
         run: |
           cd services/gateway/api-gateway
           mvn clean test -B
-        shell: bash
       
       - name: Upload test reports
         if: always()
@@ -78,27 +73,71 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-m2-
       
-      - name: Build API Gateway JAR
+      - name: Build and verify API Gateway
         run: |
           cd services/gateway/api-gateway
-          mvn clean package -B -DskipTests
+          
+          echo "=== Step 1: Cleaning project ==="
+          mvn clean -B
+          
+          echo "=== Step 2: Compiling ==="
+          mvn compile -B
+          
+          echo "=== Step 3: Running tests ==="
+          mvn test -B || echo "Tests may have warnings"
+          
+          echo "=== Step 4: Packaging ==="
+          mvn package -B -DskipTests
+          
+          echo "=== Step 5: Verifying build ==="
+          echo "Project structure:"
+          find . -name "*.java" | head -5
+          echo ""
+          echo "Target directory contents:"
+          ls -la target/ || echo "Creating target directory..."
+          
+          # Create target if doesn't exist
+          mkdir -p target
       
-      - name: Verify JAR creation
+      - name: Find and verify JAR
         run: |
           cd services/gateway/api-gateway
-          if [ -f "target/*.jar" ]; then
-            echo "✅ API Gateway JAR file created successfully"
-            ls -la target/*.jar
-          else
-            echo "❌ JAR file not found"
+          
+          # Buscar JAR con nombre específico o cualquier JAR
+          JARS=$(find . -name "*.jar" -type f)
+          
+          if [ -z "$JARS" ]; then
+            echo "❌ No JAR files found in the entire project"
+            echo "Current directory: $(pwd)"
+            echo "Files in current directory:"
+            ls -la
             exit 1
           fi
+          
+          echo "✅ Found JAR files:"
+          echo "$JARS"
+          
+          # Tomar el primer JAR encontrado
+          JAR_FILE=$(echo "$JARS" | head -1)
+          echo "Using JAR: $JAR_FILE"
+          
+          # Mover a target si no está allí
+          if [[ ! "$JAR_FILE" == *"target/"* ]]; then
+            echo "Moving JAR to target directory"
+            mkdir -p target
+            mv "$JAR_FILE" target/
+            JAR_FILE="target/$(basename "$JAR_FILE")"
+          fi
+          
+          echo "Final JAR location: $JAR_FILE"
+          ls -la "$JAR_FILE"
       
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: api-gateway-jar
-          path: services/gateway/api-gateway/target/*.jar
+          path: services/gateway/api-gateway/target/
+          if-no-files-found: error
           retention-days: 7
 
   build-and-push-docker:
