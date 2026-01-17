@@ -182,5 +182,5 @@ jobs:
           echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:latest"
           echo "   - ${{ secrets.DOCKERHUB_USERNAME }}/parking-space-service:${{ github.sha }}"
           echo ""
-          echo "📊 Test reports and artifacts available in GitHub Actions"
+          echo "Test reports and artifacts available in GitHub Actions"
         shell: bash
