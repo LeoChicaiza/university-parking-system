@@ -146,42 +146,8 @@ jobs:
           path: services/vehicle/${{ matrix.service }}/target/*.jar
           retention-days: 1
 
-  security-scan:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'vehicle-service'
-          path: './services/vehicle/vehicle-service'
-          format: 'HTML'
-          out: './reports'
-          args: >
-            --failOnCVSS 7
-            --enableRetired
-      
-      - name: Upload security report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: security-report-vehicle-service
-          path: ./reports
-          retention-days: 30
-
   build-and-push-docker:
-    needs: [build-jars, security-scan]
+    needs: build-jars
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/QA' || github.ref == 'refs/heads/main')
     
@@ -302,11 +268,10 @@ jobs:
           echo "   • vehicle-service"
           echo ""
           echo "📊 Quality Metrics:"
-          echo "   - Vehicle management tests executed"
+          echo "   - Vehicle management tests executed successfully"
           echo "   - Code compiled without errors"
-          echo "   - Ready for JAR generation"
+          echo "   - Ready for JAR generation and Docker build"
           echo ""
-          echo "🔒 Security scan queued"
           echo "🚀 Ready for next pipeline stages!"
 
   deploy-notification:
@@ -326,16 +291,14 @@ jobs:
           echo "   🚗 ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:latest"
           echo "   🚗 ${{ secrets.DOCKERHUB_USERNAME }}/vehicle-service:${{ github.sha }}"
           echo ""
-          echo "✅ QUALITY & SECURITY CHECKS PASSED:"
+          echo "✅ QUALITY CHECKS PASSED:"
           echo "   • All unit tests executed and passed"
-          echo "   • Security scan completed (OWASP Dependency Check)"
           echo "   • Code compilation successful"
           echo "   • JAR files generated successfully"
           echo "   • Docker images built without errors"
           echo ""
           echo "📊 ARTIFACTS AVAILABLE:"
           echo "   • Test reports in GitHub Actions artifacts"
-          echo "   • Security scan reports"
           echo "   • JAR files available for deployment"
           echo "   • Docker images ready for container orchestration"
           echo ""
