@@ -1,4 +1,3 @@
-
 package com.university.parking.notification.controller;
 
 import com.university.parking.notification.model.NotificationRequest;

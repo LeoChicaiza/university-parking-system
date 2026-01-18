@@ -26,6 +26,7 @@ public class VehicleService {
     }
 
     public List<Vehicle> getVehiclesByOwner(String email) {
+        // CORRECCIÓN: Debe ser findByOwner (NO findByOwnerEmail)
         return repository.findByOwner(email);
     }
 }

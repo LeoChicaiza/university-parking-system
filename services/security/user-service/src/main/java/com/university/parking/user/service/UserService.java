@@ -1,5 +1,6 @@
 package com.university.parking.user.service;
 
+import com.university.parking.user.model.Role;
 import com.university.parking.user.model.User;
 import com.university.parking.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,10 @@ public class UserService {
     }
 
     public User createUser(String email, String name, String role) {
-        return repository.save(new User(email, name, role));
+        // Convertir String a Role enum - ESTO LANZARÁ IllegalArgumentException si el rol no es válido
+        Role userRole = Role.valueOf(role.toUpperCase());
+        
+        return repository.save(new User(email, name, userRole));
     }
 
     public User getUser(String email) {
@@ -27,11 +31,12 @@ public class UserService {
     }
 
     public String getUserRole(String email) {
-        return getUser(email).getRole();
+        return getUser(email).getRole().name();
     }
 
     public void deactivateUser(String email) {
         User user = getUser(email);
         user.deactivate();
+        repository.save(user);
     }
 }

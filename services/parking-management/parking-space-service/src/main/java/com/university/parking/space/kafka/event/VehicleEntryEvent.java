@@ -1,22 +1,19 @@
-package com.university.parking.entry.kafka.event;
+package com.university.parking.space.kafka.event;
+
+import java.time.LocalDateTime;
 
 public class VehicleEntryEvent {
-
     private String plate;
-    private String entryTime;
-
-    public VehicleEntryEvent() {}
-
-    public VehicleEntryEvent(String plate, String entryTime) {
-        this.plate = plate;
-        this.entryTime = entryTime;
-    }
-
-    public String getPlate() {
-        return plate;
-    }
-
-    public String getEntryTime() {
-        return entryTime;
-    }
+    private String parkingZone;
+    private LocalDateTime entryTime;
+    
+    // Getters y setters
+    public String getPlate() { return plate; }
+    public void setPlate(String plate) { this.plate = plate; }
+    
+    public String getParkingZone() { return parkingZone; }
+    public void setParkingZone(String parkingZone) { this.parkingZone = parkingZone; }
+    
+    public LocalDateTime getEntryTime() { return entryTime; }
+    public void setEntryTime(LocalDateTime entryTime) { this.entryTime = entryTime; }
 }

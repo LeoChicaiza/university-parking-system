@@ -1,4 +1,4 @@
-package com.university.parking.parkingspace.rabbitmq;
+package com.university.parking.space.rabbitmq;
 
 import org.springframework.amqp.core.Queue;
 import org.springframework.context.annotation.Bean;

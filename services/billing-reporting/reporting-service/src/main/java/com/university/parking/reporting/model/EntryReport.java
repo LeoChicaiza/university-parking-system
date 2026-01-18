@@ -22,7 +22,16 @@ public class EntryReport {
         this.entryTime = entryTime;
     }
 
+    // Getters públicos
     public UUID getId() {
         return id;
+    }
+    
+    public String getPlate() {
+        return plate;
+    }
+    
+    public LocalDateTime getEntryTime() {
+        return entryTime;
     }
 }

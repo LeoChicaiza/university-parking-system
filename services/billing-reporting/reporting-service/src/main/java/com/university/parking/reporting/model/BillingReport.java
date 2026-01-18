@@ -24,7 +24,20 @@ public class BillingReport {
         this.createdAt = LocalDateTime.now();
     }
 
+    // Getters públicos
     public UUID getId() {
         return id;
+    }
+    
+    public String getPlate() {
+        return plate;
+    }
+    
+    public double getAmount() {
+        return amount;
+    }
+    
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
 }

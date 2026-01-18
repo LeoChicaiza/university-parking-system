@@ -1,4 +1,3 @@
-
 package com.university.parking.notification.model;
 
 public class NotificationRequest {

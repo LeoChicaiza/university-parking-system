@@ -3,7 +3,17 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": ["target/**"],
+      "cache": {
+        "outputs": ["target/**"]
+      }
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": ["target/surefire-reports/**"],
+      "cache": {
+        "outputs": ["target/surefire-reports/**"]
+      }
     },
     "docker": {
       "dependsOn": ["build"],

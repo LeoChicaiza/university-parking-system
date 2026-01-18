@@ -1,7 +1,7 @@
 package com.university.parking.entry.controller;
 
-import com.university.parking.entry.model.EntryRecord;
 import com.university.parking.entry.model.EntryRequest;
+import com.university.parking.entry.model.ParkingEntry;
 import com.university.parking.entry.service.EntryService;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,12 +16,13 @@ public class EntryController {
     }
 
     @PostMapping
-    public EntryRecord entry(@RequestBody EntryRequest request) {
+    public ParkingEntry entry(@RequestBody EntryRequest request) {
         return service.processEntry(request);
     }
 
     @GetMapping("/active/{plate}")
-    public EntryRecord active(@PathVariable String plate) {
+    public ParkingEntry active(@PathVariable String plate) {
         return service.getActiveEntry(plate);
     }
 }
+

@@ -22,7 +22,16 @@ public class ExitReport {
         this.exitTime = exitTime;
     }
 
+    // Getters públicos
     public UUID getId() {
         return id;
+    }
+    
+    public String getPlate() {
+        return plate;
+    }
+    
+    public LocalDateTime getExitTime() {
+        return exitTime;
     }
 }

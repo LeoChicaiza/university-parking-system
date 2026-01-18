@@ -5,5 +5,13 @@
     "build": "mvn clean package -DskipTests",
     "docker": "docker build -t $IMAGE_NAME .",
     "deploy": "echo Deploying user-service"
+  },
+  "name": "@university-parking/billing-service",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "mvn clean package -DskipTests",
+    "test": "mvn clean test",
+    "docker": "echo 'Docker build would run here'"
+
   }
 }
