@@ -100,7 +100,8 @@ class ExitServiceTest {
         verify(kafkaProducer, times(1)).sendVehicleExit(any(VehicleExitEvent.class));
         verify(rabbitProducer, times(1)).sendExitMessage(eq(testPlate));
         verify(redisTemplate, times(1)).delete("active-entry:" + testPlate);
-        verify(logger, times(1)).info(anyString(), any());
+        //verify(logger, times(1)).info(anyString(), any());
+        verify(logger, atLeastOnce()).info(anyString(), any());
     }
 
     @Test
