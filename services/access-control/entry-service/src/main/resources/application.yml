@@ -31,4 +31,8 @@ management:
       exposure:
         include: health,info
 
+supabase:
+  url: ${SUPABASE_URL}
+  apikey: ${SUPABASE_API_KEY}
+
 
