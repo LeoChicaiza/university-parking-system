@@ -11,6 +11,10 @@ on:
     paths:
       - "services/access-control/**"
 
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
+
 jobs:
   test:
     runs-on: ubuntu-latest

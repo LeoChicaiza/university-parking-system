@@ -3,6 +3,7 @@ package com.university.parking.exit.service;
 import com.university.parking.exit.kafka.event.VehicleExitEvent;
 import com.university.parking.exit.kafka.producer.ExitEventProducer;
 import com.university.parking.exit.rabbitmq.ExitRabbitProducer;
+import com.university.parking.exit.logging.SupabaseLogClient;
 import com.university.parking.exit.model.ParkingExit;
 import com.university.parking.exit.repository.ExitRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,24 +24,29 @@ public class ExitService {
     private final ExitRabbitProducer rabbitProducer;
     private final RestTemplate restTemplate;
     private final StringRedisTemplate redisTemplate;
+    private final SupabaseLogClient logger;
 
     public ExitService(
             ExitRepository repository,
             ExitEventProducer kafkaProducer,
             ExitRabbitProducer rabbitProducer,
             RestTemplate restTemplate,
-            StringRedisTemplate redisTemplate
+            StringRedisTemplate redisTemplate,
+            SupabaseLogClient logger
     ) {
         this.repository = repository;
         this.kafkaProducer = kafkaProducer;
         this.rabbitProducer = rabbitProducer;
         this.restTemplate = restTemplate;
         this.redisTemplate = redisTemplate;
+        this.logger = logger;
     }
 
     public Map<String, Object> processExit(String plate) {
 
-        // 1️⃣ CONSULTAR ENTRADA ACTIVA (ENTRY-SERVICE)
+        logger.info("Processing vehicle exit", Map.of("plate", plate));
+
+        // 1️⃣ CONSULTAR ENTRADA ACTIVA
         Map entry = restTemplate.getForObject(
                 "http://entry-service/entry/active/{plate}",
                 Map.class,
@@ -48,6 +54,7 @@ public class ExitService {
         );
 
         if (entry == null || entry.get("id") == null) {
+            logger.error("No active entry found for exit", Map.of("plate", plate));
             throw new RuntimeException("No active entry found for vehicle");
         }
 
@@ -63,7 +70,12 @@ public class ExitService {
 
         ParkingExit saved = repository.save(exit);
 
-        // 3️⃣ EVENTO KAFKA (DOMINIO)
+        logger.info("Exit persisted successfully", Map.of(
+                "exitId", saved.getId(),
+                "plate", plate
+        ));
+
+        // 3️⃣ EVENTO KAFKA
         kafkaProducer.sendVehicleExit(
                 new VehicleExitEvent(
                         plate,
@@ -71,13 +83,17 @@ public class ExitService {
                 )
         );
 
-        // 4️⃣ MENSAJE RABBITMQ (OPERATIVO)
+        // 4️⃣ MENSAJE RABBITMQ
         rabbitProducer.sendExitMessage(plate);
 
-        // 5️⃣ 🧹 LIMPIAR REDIS
+        // 5️⃣ LIMPIAR REDIS
         redisTemplate.delete(ACTIVE_ENTRY_KEY + plate);
 
-        // 6️⃣ RESPUESTA
+        logger.info("Vehicle exit completed", Map.of(
+                "plate", plate,
+                "exitTime", exitTime
+        ));
+
         return Map.of(
                 "exitId", saved.getId(),
                 "plate", plate,
@@ -86,4 +102,3 @@ public class ExitService {
         );
     }
 }
-

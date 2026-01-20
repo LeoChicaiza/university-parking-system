@@ -12,6 +12,8 @@ import org.mockito.ArgumentMatchers;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.web.client.RestTemplate;
+import com.university.parking.entry.logging.SupabaseLogClient;
+
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -29,6 +31,8 @@ class EntryServiceTest {
     private EntryEventProducer producer;
     private StringRedisTemplate redisTemplate;
     private ValueOperations<String, String> valueOps;
+    private SupabaseLogClient logger;
+
 
     private EntryService service;
 
@@ -39,6 +43,7 @@ class EntryServiceTest {
         producer = mock(EntryEventProducer.class);
         redisTemplate = mock(StringRedisTemplate.class);
         valueOps = mock(ValueOperations.class);
+        logger = mock(SupabaseLogClient.class);
 
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
 
@@ -46,7 +51,8 @@ class EntryServiceTest {
                 repository,
                 restTemplate,
                 producer,
-                redisTemplate
+                redisTemplate,
+                logger
         );
     }
 

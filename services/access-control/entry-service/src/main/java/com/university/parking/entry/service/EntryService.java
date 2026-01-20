@@ -2,6 +2,7 @@ package com.university.parking.entry.service;
 
 import com.university.parking.entry.kafka.event.VehicleEntryEvent;
 import com.university.parking.entry.kafka.producer.EntryEventProducer;
+import com.university.parking.entry.logging.SupabaseLogClient;
 import com.university.parking.entry.model.*;
 import com.university.parking.entry.repository.EntryRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,31 +23,38 @@ public class EntryService {
     private final RestTemplate restTemplate;
     private final EntryEventProducer producer;
     private final StringRedisTemplate redisTemplate;
+    private final SupabaseLogClient logger;
 
     public EntryService(
             EntryRepository repository,
             RestTemplate restTemplate,
             EntryEventProducer producer,
-            StringRedisTemplate redisTemplate
+            StringRedisTemplate redisTemplate,
+            SupabaseLogClient logger
     ) {
         this.repository = repository;
         this.restTemplate = restTemplate;
         this.producer = producer;
         this.redisTemplate = redisTemplate;
+        this.logger = logger;
     }
 
     public ParkingEntry processEntry(EntryRequest request) {
+
+        logger.info("Processing vehicle entry", request);
 
         String redisKey = ACTIVE_ENTRY_KEY + request.plate;
 
         // 1️⃣ VALIDAR EN REDIS (RÁPIDO)
         if (Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
+            logger.error("Vehicle already inside (Redis)", request.plate);
             throw new RuntimeException("Vehicle already inside (Redis)");
         }
 
         // 2️⃣ VALIDAR EN BD (CONSISTENCIA)
         repository.findByPlateAndStatus(request.plate, EntryStatus.ACTIVE)
                 .ifPresent(r -> {
+                    logger.error("Vehicle already inside (DB)", request.plate);
                     throw new RuntimeException("Vehicle already inside (DB)");
                 });
 
@@ -59,6 +67,10 @@ public class EntryService {
         );
 
         if (Boolean.FALSE.equals(validVehicle)) {
+            logger.error("Vehicle not authorized", Map.of(
+                    "plate", request.plate,
+                    "email", request.userEmail
+            ));
             throw new RuntimeException("Vehicle not authorized");
         }
 
@@ -70,6 +82,11 @@ public class EntryService {
         );
 
         String spaceId = (String) space.get("id");
+
+        logger.info("Parking space assigned", Map.of(
+                "plate", request.plate,
+                "spaceId", spaceId
+        ));
 
         // 5️⃣ OCUPAR CAPACIDAD
         restTemplate.postForObject(
@@ -90,6 +107,12 @@ public class EntryService {
 
         ParkingEntry saved = repository.save(entry);
 
+        logger.info("Parking entry saved", Map.of(
+                "entryId", saved.getId(),
+                "plate", saved.getPlate(),
+                "lotId", saved.getLotId()
+        ));
+
         // 7️⃣ GUARDAR EN REDIS
         redisTemplate.opsForValue().set(
                 redisKey,
@@ -106,10 +129,15 @@ public class EntryService {
                 )
         );
 
+        logger.info("Kafka vehicle entry event sent", request.plate);
+
         return saved;
     }
 
     public ParkingEntry getActiveEntry(String plate) {
+
+        logger.info("Fetching active entry", plate);
+
         return repository.findByPlateAndStatus(plate, EntryStatus.ACTIVE)
                 .orElseThrow(() -> new RuntimeException("No active entry found"));
     }
@@ -124,6 +152,10 @@ public class EntryService {
 
         // 🧹 ELIMINAR DE REDIS
         redisTemplate.delete(ACTIVE_ENTRY_KEY + entry.getPlate());
+
+        logger.info("Entry closed", Map.of(
+                "entryId", entryId,
+                "plate", entry.getPlate()
+        ));
     }
 }
-
