@@ -16,24 +16,28 @@ spring:
     show-sql: true
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
   rabbitmq:
-    host: localhost
+    host: rabbitmq
     port: 5672
     username: guest
     password: guest
+
+  supabase:
+    url: ${SUPABASE_URL}
+    apikey: ${SUPABASE_API_KEY}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
 
-supabase:
-  url: ${SUPABASE_URL}
-  apikey: ${SUPABASE_API_KEY}
 

@@ -15,6 +15,11 @@ public class VehicleService {
         this.repository = repository;
     }
 
+    public Vehicle getByPlate(String plate) {
+        return repository.findByPlate(plate)
+                .orElseThrow(() -> new RuntimeException("Vehicle not found"));
+    }
+
     public Vehicle registerVehicle(Vehicle vehicle) {
         return repository.save(vehicle);
     }
@@ -26,7 +31,7 @@ public class VehicleService {
     }
 
     public List<Vehicle> getVehiclesByOwner(String email) {
-        // CORRECCIÓN: Debe ser findByOwner (NO findByOwnerEmail)
-        return repository.findByOwner(email);
+        // CORRECCIÓN (findByOwnerEmail)
+        return repository.findByOwnerEmail(email);
     }
 }

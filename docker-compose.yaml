@@ -157,17 +157,43 @@ services:
       - parking-network
 
   billing-service:
-    build: ./services/billing/billing-service
+    build: ./services/billing-reporting/billing-service
     networks:
       - parking-network
 
   notification-service:
-    build: ./services/notification/notification-service
+    build: ./services/billing-reporting/notification-service
     networks:
       - parking-network
 
   reporting-service:
-    build: ./services/reporting/reporting-service
+    build: ./services/billing-reporting/reporting-service
+    networks:
+      - parking-network
+
+  # -------------------------
+  # PROMETHEUS
+  # -------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - parking-network
+
+  # -------------------------
+  # GRAFANA
+  # -------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
     networks:
       - parking-network
 

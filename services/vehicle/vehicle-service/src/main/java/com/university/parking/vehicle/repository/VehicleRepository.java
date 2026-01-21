@@ -8,6 +8,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VehicleRepository extends JpaRepository<Vehicle, UUID> {
+
     Optional<Vehicle> findByPlate(String plate);
-    List<Vehicle> findByOwner(String owner);  // Cambiado a findByOwner
+
+    List<Vehicle> findByOwnerEmail(String ownerEmail);
 }
+

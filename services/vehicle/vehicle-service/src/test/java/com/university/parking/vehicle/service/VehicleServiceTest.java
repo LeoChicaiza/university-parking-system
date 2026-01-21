@@ -112,8 +112,8 @@ class VehicleServiceTest {
         Vehicle vehicle2 = new Vehicle("XYZ789", "Honda", "Civic", ownerEmail);
         List<Vehicle> expectedVehicles = Arrays.asList(vehicle1, vehicle2);
         
-        // CORRECCIÓN: Usar findByOwner (no findByOwnerEmail)
-        when(vehicleRepository.findByOwner(ownerEmail)).thenReturn(expectedVehicles);
+        
+        when(vehicleRepository.findByOwnerEmail(ownerEmail)).thenReturn(expectedVehicles);
 
         // Act
         List<Vehicle> result = vehicleService.getVehiclesByOwner(ownerEmail);
@@ -123,7 +123,7 @@ class VehicleServiceTest {
         assertEquals(2, result.size());
         assertEquals("ABC123", result.get(0).getPlate());
         assertEquals("XYZ789", result.get(1).getPlate());
-        verify(vehicleRepository, times(1)).findByOwner(ownerEmail);
+        verify(vehicleRepository, times(1)).findByOwnerEmail(ownerEmail);
     }
 
     @Test
@@ -132,8 +132,8 @@ class VehicleServiceTest {
         String ownerEmail = "no.vehicles@university.edu";
         List<Vehicle> emptyList = Arrays.asList();
         
-        // CORRECCIÓN: Usar findByOwner (no findByOwnerEmail)
-        when(vehicleRepository.findByOwner(ownerEmail)).thenReturn(emptyList);
+        
+        when(vehicleRepository.findByOwnerEmail(ownerEmail)).thenReturn(List.of());
 
         // Act
         List<Vehicle> result = vehicleService.getVehiclesByOwner(ownerEmail);
@@ -141,6 +141,6 @@ class VehicleServiceTest {
         // Assert
         assertNotNull(result);
         assertTrue(result.isEmpty());
-        verify(vehicleRepository, times(1)).findByOwner(ownerEmail);
+        verify(vehicleRepository, times(1)).findByOwnerEmail(ownerEmail);
     }
 }

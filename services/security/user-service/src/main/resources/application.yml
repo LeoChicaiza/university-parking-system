@@ -2,6 +2,9 @@ server:
   port: 8081
 
 spring:
+  application:
+    name: user-service
+
   datasource:
     url: jdbc:postgresql://postgres-core:5432/core_domain_db
     username: core_user
@@ -16,6 +19,8 @@ spring:
       hibernate:
         format_sql: true
 
-  application:
-    name: user-service
-
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

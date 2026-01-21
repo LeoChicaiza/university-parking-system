@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  # -------------------------
+  # PROMETHEUS (SELF)
+  # -------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # -------------------------
+  # ENTRY SERVICE
+  # -------------------------
+  - job_name: "entry-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["entry-service:8085"]
+
+  # -------------------------
+  # EXIT SERVICE
+  # -------------------------
+  - job_name: "exit-service"
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["exit-service:8086"]

@@ -1,9 +1,33 @@
-CREATE TABLE vehicles (
-    plate VARCHAR(20) PRIMARY KEY,
-    brand VARCHAR(100) NOT NULL,
-    model VARCHAR(100) NOT NULL,
-    owner_email VARCHAR(255) NOT NULL
+CREATE TABLE access_domain.parking_entry (
+    id UUID PRIMARY KEY,
+    plate VARCHAR(20) NOT NULL,
+    lot_id VARCHAR(50),
+    space_id VARCHAR(50),
+    entry_time TIMESTAMP NOT NULL,
+    status VARCHAR(20)
 );
 
-CREATE INDEX idx_vehicle_owner
-ON vehicles(owner_email);
+CREATE TABLE access_domain.parking_exit (
+    id UUID PRIMARY KEY,
+    plate VARCHAR(20) NOT NULL,
+    entry_id UUID,
+    exit_time TIMESTAMP NOT NULL
+);
+
+CREATE TABLE billing_domain.billing_record (
+    id UUID PRIMARY KEY,
+    plate VARCHAR(20),
+    entry_time TIMESTAMP,
+    exit_time TIMESTAMP,
+    duration_minutes INT,
+    amount DECIMAL(10,2),
+    status VARCHAR(20)
+);
+
+CREATE TABLE reporting_domain.parking_event_log (
+    id UUID PRIMARY KEY,
+    event_type VARCHAR(50),
+    plate VARCHAR(20),
+    timestamp TIMESTAMP,
+    payload JSONB
+);

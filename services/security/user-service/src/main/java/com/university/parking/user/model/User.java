@@ -40,8 +40,7 @@ public class User {
     // Setters mínimos necesarios para pruebas
     public void setId(UUID id) { this.id = id; }
     
-    // NO agregues setActive() si no lo necesitas en producción
-    // En su lugar, podemos usar deactivate() para cambiar el estado
+  
 
     public void deactivate() {
         this.active = false;
