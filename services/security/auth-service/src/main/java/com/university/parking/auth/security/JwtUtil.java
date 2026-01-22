@@ -3,6 +3,7 @@ package com.university.parking.auth.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -14,49 +15,70 @@ import java.util.Map;
 @Component
 public class JwtUtil {
 
-    private final String SECRET = "my-super-secret-key-for-jwt-256-bits-123!";
-    private final SecretKey SECRET_KEY;
+    private final SecretKey secretKey;
     
-    public JwtUtil() {
-        // Crear una clave segura de 256 bits
-        this.SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    @Value("${jwt.expiration}")
+    private Long jwtExpiration;
+    
+    @Value("${jwt.refresh-expiration}")
+    private Long refreshExpiration;
+    
+    public JwtUtil(@Value("${jwt.secret}") String secret) {
+        // MISMA CLAVE que en Gateway
+        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
     
-    public String generateToken(String email, String role) {
+    public String generateAccessToken(String email, String role, String userId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
+        claims.put("userId", userId);
+        claims.put("type", "ACCESS");
         
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(email != null ? email : "") // Manejar email null o vacío
+                .setSubject(email)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 3600000))
-                .signWith(SECRET_KEY)
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(secretKey)
                 .compact();
     }
     
-    // Métodos para extraer información del token
+    public String generateRefreshToken(String email, String userId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("type", "REFRESH");
+        
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
+                .signWith(secretKey)
+                .compact();
+    }
+    
     public Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+                .setSigningKey(secretKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
     }
     
     public String extractUsername(String token) {
-        Claims claims = extractAllClaims(token);
-        String subject = claims.getSubject();
-        return subject != null ? subject : "";
+        return extractAllClaims(token).getSubject();
     }
     
     public String extractRole(String token) {
-        Claims claims = extractAllClaims(token);
-        return claims.get("role", String.class);
+        return extractAllClaims(token).get("role", String.class);
     }
     
-    public Date extractExpiration(String token) {
-        return extractAllClaims(token).getExpiration();
+    public String extractUserId(String token) {
+        return extractAllClaims(token).get("userId", String.class);
+    }
+    
+    public String extractTokenType(String token) {
+        return extractAllClaims(token).get("type", String.class);
     }
     
     public boolean isTokenValid(String token) {
@@ -66,5 +88,9 @@ public class JwtUtil {
         } catch (Exception e) {
             return false;
         }
+    }
+    
+    public boolean isTokenExpired(String token) {
+        return extractAllClaims(token).getExpiration().before(new Date());
     }
 }

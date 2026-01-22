@@ -26,6 +26,6 @@ WORKDIR /app
 
 # Copiamos el JAR
 COPY --from=build /app/target/*.jar app.jar
-
+#COPY target/api-gateway-1.0.0.jar app.jar 
 # Ejecutamos el microservicio
 ENTRYPOINT ["java","-jar","app.jar"]

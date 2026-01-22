@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -46,6 +47,29 @@ class UserServiceTest {
         assertEquals(name, result.getName());
         assertEquals(Role.STUDENT, result.getRole());
         assertTrue(result.isActive());
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void createUser_WithRoleEnum_CreatesUserSuccessfully() {
+        // Arrange
+        String email = "teacher@university.edu";
+        String name = "Jane Doe";
+        Role role = Role.TEACHER;
+        
+        User savedUser = new User(email, name, role);
+        savedUser.setId(UUID.randomUUID());
+        
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+
+        // Act
+        User result = userService.createUser(email, name, role);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(email, result.getEmail());
+        assertEquals(name, result.getName());
+        assertEquals(role, result.getRole());
         verify(userRepository, times(1)).save(any(User.class));
     }
 
@@ -153,23 +177,19 @@ class UserServiceTest {
     }
     
     @Test
-    void createUser_WithInvalidRole_ThrowsIllegalArgumentException() {
+    void createUser_WithInvalidRole_ThrowsRuntimeException() {
         // Arrange
         String email = "test@university.edu";
         String name = "Test User";
         String invalidRole = "INVALID_ROLE";
         
-        // NO configuramos mock para repository.save porque la excepción
-        // se lanzará ANTES de llegar a guardar
-        
         // Act & Assert
-        // Role.valueOf("INVALID_ROLE".toUpperCase()) lanzará IllegalArgumentException
-        assertThrows(
-            IllegalArgumentException.class,
+        RuntimeException exception = assertThrows(
+            RuntimeException.class,
             () -> userService.createUser(email, name, invalidRole)
         );
         
-        // Verificamos que NUNCA se llame a save porque la excepción se lanza antes
+        assertEquals("Invalid role: INVALID_ROLE", exception.getMessage());
         verify(userRepository, never()).save(any(User.class));
     }
     
@@ -211,5 +231,91 @@ class UserServiceTest {
         assertNotNull(result);
         assertEquals(Role.TEACHER, result.getRole());
         verify(userRepository, times(1)).save(any(User.class));
+    }
+    
+    @Test
+    void getUserById_WhenUserExists_ReturnsUser() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        User expectedUser = new User("test@university.edu", "Test User", Role.STUDENT);
+        expectedUser.setId(userId);
+        
+        when(userRepository.findById(userId)).thenReturn(Optional.of(expectedUser));
+
+        // Act
+        User result = userService.getUserById(userId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(userId, result.getId());
+        verify(userRepository, times(1)).findById(userId);
+    }
+    
+    @Test
+    void validateCredentials_WithValidUser_ReturnsTrue() {
+        // Arrange
+        String email = "valid@university.edu";
+        User user = new User(email, "Valid User", Role.STUDENT);
+        
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        // Act
+        boolean result = userService.validateCredentials(email, "password");
+
+        // Assert
+        assertTrue(result);
+        verify(userRepository, times(1)).findByEmail(email);
+    }
+    
+    @Test
+    void validateCredentials_WithInvalidPassword_ReturnsFalse() {
+        // Arrange
+        String email = "valid@university.edu";
+        User user = new User(email, "Valid User", Role.STUDENT);
+        
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        // Act
+        boolean result = userService.validateCredentials(email, "wrongpassword");
+
+        // Assert
+        assertFalse(result);
+        verify(userRepository, times(1)).findByEmail(email);
+    }
+    
+    @Test
+    void validateCredentials_WithInactiveUser_ReturnsFalse() {
+        // Arrange
+        String email = "inactive@university.edu";
+        User user = new User(email, "Inactive User", Role.STUDENT);
+        user.deactivate();
+        
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        // Act
+        boolean result = userService.validateCredentials(email, "password");
+
+        // Assert
+        assertFalse(result);
+        verify(userRepository, times(1)).findByEmail(email);
+    }
+    
+    @Test
+    void getAllUsers_ReturnsAllUsers() {
+        // Arrange
+        List<User> expectedUsers = List.of(
+            new User("user1@university.edu", "User 1", Role.STUDENT),
+            new User("user2@university.edu", "User 2", Role.TEACHER)
+        );
+        
+        when(userRepository.findAll()).thenReturn(expectedUsers);
+
+        // Act
+        Iterable<User> result = userService.getAllUsers();
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(expectedUsers, result);
+        verify(userRepository, times(1)).findAll();
     }
 }

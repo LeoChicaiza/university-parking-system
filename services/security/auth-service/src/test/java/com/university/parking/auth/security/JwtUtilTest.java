@@ -1,42 +1,36 @@
 package com.university.parking.auth.security;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@TestPropertySource(properties = {
+    "jwt.secret=university-parking-system-super-secret-key-256-bits-2026",
+    "jwt.expiration=86400000",
+    "jwt.refresh-expiration=604800000"
+})
 class JwtUtilTest {
 
+    @Autowired
     private JwtUtil jwtUtil;
-    private SecretKey secretKey;
-
-    @BeforeEach
-    void setUp() {
-        jwtUtil = new JwtUtil();
-        
-        // Usar la misma clave que en JwtUtil
-        String secret = "my-super-secret-key-for-jwt-256-bits-123!";
-        secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    }
 
     @Test
-    void generateToken_ShouldCreateValidJWT() {
+    void generateAccessToken_ShouldCreateValidJWT() {
         // Arrange
         String email = "test@university.edu";
         String role = "USER";
+        String userId = UUID.randomUUID().toString();
 
         // Act
-        String token = jwtUtil.generateToken(email, role);
+        String token = jwtUtil.generateAccessToken(email, role, userId);
 
         // Assert
         assertNotNull(token);
@@ -44,14 +38,12 @@ class JwtUtilTest {
         
         // Verificar que el token puede ser parseado
         try {
-            Claims claims = Jwts.parserBuilder()
-                .setSigningKey(secretKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+            Claims claims = jwtUtil.extractAllClaims(token);
             
             assertEquals(email, claims.getSubject());
             assertEquals(role, claims.get("role", String.class));
+            assertEquals(userId, claims.get("userId", String.class));
+            assertEquals("ACCESS", claims.get("type", String.class));
             assertNotNull(claims.getIssuedAt());
             assertNotNull(claims.getExpiration());
             assertTrue(claims.getExpiration().after(new Date()));
@@ -61,112 +53,52 @@ class JwtUtilTest {
     }
 
     @Test
-    void generateToken_WithDifferentRoles_ShouldIncludeRoleInClaim() {
-        // Arrange
-        String email = "admin@university.edu";
-        String[] roles = {"ADMIN", "USER", "OPERATOR"};
-
-        for (String role : roles) {
-            // Act
-            String token = jwtUtil.generateToken(email, role);
-
-            // Assert
-            Claims claims = Jwts.parserBuilder()
-                .setSigningKey(secretKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-            
-            assertEquals(role, claims.get("role", String.class), 
-                "Token should contain role: " + role);
-        }
-    }
-
-    @Test
-    void generateToken_ShouldHaveOneHourExpiration() {
+    void generateRefreshToken_ShouldCreateValidJWT() {
         // Arrange
         String email = "test@university.edu";
-        String role = "USER";
-        long oneHourInMillis = 3600000;
-        long tolerance = 5000; // 5 seconds tolerance
+        String userId = UUID.randomUUID().toString();
 
         // Act
-        String token = jwtUtil.generateToken(email, role);
-
-        // Assert
-        Claims claims = Jwts.parserBuilder()
-            .setSigningKey(secretKey)
-            .build()
-            .parseClaimsJws(token)
-            .getBody();
-        
-        Date issuedAt = claims.getIssuedAt();
-        Date expiration = claims.getExpiration();
-        
-        long actualDuration = expiration.getTime() - issuedAt.getTime();
-        long difference = Math.abs(actualDuration - oneHourInMillis);
-        
-        assertTrue(difference <= tolerance, 
-            "Token should expire in approximately 1 hour. Difference: " + difference + "ms");
-    }
-
-    @Test
-    void generateToken_WithEmptyEmail_ShouldStillCreateToken() {
-        // Arrange
-        String emptyEmail = "";
-        String role = "USER";
-
-        // Act
-        String token = jwtUtil.generateToken(emptyEmail, role);
+        String token = jwtUtil.generateRefreshToken(email, userId);
 
         // Assert
         assertNotNull(token);
         assertFalse(token.isEmpty());
         
-        // Verificar usando el método extractUsername de JwtUtil
-        String extractedEmail = jwtUtil.extractUsername(token);
-        assertEquals("", extractedEmail, "Extracted email should be empty string");
+        Claims claims = jwtUtil.extractAllClaims(token);
         
-        // También verificar usando JWT parser directamente
-        Claims claims = Jwts.parserBuilder()
-            .setSigningKey(secretKey)
-            .build()
-            .parseClaimsJws(token)
-            .getBody();
-        
-        String subject = claims.getSubject();
-        assertNotNull(subject, "Subject should not be null");
-        assertEquals("", subject, "Subject should be empty string");
+        assertEquals(email, claims.getSubject());
+        assertEquals(userId, claims.get("userId", String.class));
+        assertEquals("REFRESH", claims.get("type", String.class));
     }
 
     @Test
-    void generateToken_WithNullRole_ShouldHandleGracefully() {
+    void generateAccessToken_WithDifferentRoles_ShouldIncludeRoleInClaim() {
         // Arrange
-        String email = "test@university.edu";
-        String nullRole = null;
+        String email = "admin@university.edu";
+        String userId = UUID.randomUUID().toString();
+        String[] roles = {"ADMIN", "USER", "TEACHER", "VISITOR"};
 
-        // Act
-        String token = jwtUtil.generateToken(email, nullRole);
+        for (String role : roles) {
+            // Act
+            String token = jwtUtil.generateAccessToken(email, role, userId);
 
-        // Assert
-        assertNotNull(token);
-        
-        Claims claims = Jwts.parserBuilder()
-            .setSigningKey(secretKey)
-            .build()
-            .parseClaimsJws(token)
-            .getBody();
-        
-        assertNull(claims.get("role"), "Role claim should be null");
-        assertEquals(email, claims.getSubject(), "Email should be preserved");
+            // Assert
+            Claims claims = jwtUtil.extractAllClaims(token);
+            
+            assertEquals(role, claims.get("role", String.class), 
+                "Token should contain role: " + role);
+            assertEquals("ACCESS", claims.get("type", String.class));
+        }
     }
-    
+
     @Test
     void extractUsername_ShouldReturnCorrectEmail() {
         // Arrange
         String email = "student@university.edu";
         String role = "STUDENT";
-        String token = jwtUtil.generateToken(email, role);
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateAccessToken(email, role, userId);
         
         // Act
         String extractedEmail = jwtUtil.extractUsername(token);
@@ -176,23 +108,12 @@ class JwtUtilTest {
     }
     
     @Test
-    void extractUsername_WithEmptyEmail_ShouldReturnEmptyString() {
-        // Arrange
-        String token = jwtUtil.generateToken("", "USER");
-        
-        // Act
-        String extractedEmail = jwtUtil.extractUsername(token);
-        
-        // Assert
-        assertEquals("", extractedEmail);
-    }
-    
-    @Test
     void extractRole_ShouldReturnCorrectRole() {
         // Arrange
         String email = "professor@university.edu";
-        String role = "PROFESSOR";
-        String token = jwtUtil.generateToken(email, role);
+        String role = "TEACHER";
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateAccessToken(email, role, userId);
         
         // Act
         String extractedRole = jwtUtil.extractRole(token);
@@ -202,14 +123,80 @@ class JwtUtilTest {
     }
     
     @Test
-    void extractRole_WithNullRole_ShouldReturnNull() {
+    void extractUserId_ShouldReturnCorrectUserId() {
         // Arrange
-        String token = jwtUtil.generateToken("test@university.edu", null);
+        String email = "test@university.edu";
+        String role = "USER";
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateAccessToken(email, role, userId);
         
         // Act
-        String extractedRole = jwtUtil.extractRole(token);
+        String extractedUserId = jwtUtil.extractUserId(token);
         
         // Assert
-        assertNull(extractedRole);
+        assertEquals(userId, extractedUserId);
+    }
+    
+    @Test
+    void extractTokenType_AccessToken_ReturnsAccess() {
+        // Arrange
+        String email = "test@university.edu";
+        String role = "ADMIN";
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateAccessToken(email, role, userId);
+        
+        // Act
+        String tokenType = jwtUtil.extractTokenType(token);
+        
+        // Assert
+        assertEquals("ACCESS", tokenType);
+    }
+    
+    @Test
+    void extractTokenType_RefreshToken_ReturnsRefresh() {
+        // Arrange
+        String email = "test@university.edu";
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateRefreshToken(email, userId);
+        
+        // Act
+        String tokenType = jwtUtil.extractTokenType(token);
+        
+        // Assert
+        assertEquals("REFRESH", tokenType);
+    }
+    
+    @Test
+    void isTokenValid_ValidToken_ReturnsTrue() {
+        // Arrange
+        String email = "test@university.edu";
+        String role = "VISITOR";
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateAccessToken(email, role, userId);
+        
+        // Act
+        boolean isValid = jwtUtil.isTokenValid(token);
+        
+        // Assert
+        assertTrue(isValid);
+    }
+    
+    @Test
+    void extractAllClaims_ValidToken_ReturnsClaims() {
+        // Arrange
+        String email = "test@university.edu";
+        String role = "ADMIN";
+        String userId = UUID.randomUUID().toString();
+        String token = jwtUtil.generateAccessToken(email, role, userId);
+        
+        // Act
+        Claims claims = jwtUtil.extractAllClaims(token);
+        
+        // Assert
+        assertNotNull(claims);
+        assertEquals(email, claims.getSubject());
+        assertEquals(role, claims.get("role", String.class));
+        assertEquals(userId, claims.get("userId", String.class));
+        assertEquals("ACCESS", claims.get("type", String.class));
     }
 }

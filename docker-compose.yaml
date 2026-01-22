@@ -147,9 +147,19 @@ services:
       - parking-network
 
   entry-service:
-    build: ./services/access-control/entry-service
-    networks:
-      - parking-network
+  build: ./entry-service
+  ports:
+    - "8090:8090"
+  environment:
+    SPRING_PROFILES_ACTIVE: docker
+    SUPABASE_URL: ${SUPABASE_URL}
+    SUPABASE_API_KEY: ${SUPABASE_API_KEY}
+  depends_on:
+    - postgres-access
+    - kafka
+    - rabbitmq
+    - redis
+
 
   exit-service:
     build: ./services/access-control/exit-service

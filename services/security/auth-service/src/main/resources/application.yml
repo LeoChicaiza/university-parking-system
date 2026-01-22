@@ -1,32 +1,35 @@
 server:
-  port: 8081
+  port: 8081  
 
 spring:
   application:
     name: auth-service
 
-  datasource:
-    url: jdbc:postgresql://postgres-core:5432/core_domain_db
-    username: core_user
-    password: core_pass
-    driver-class-name: org.postgresql.Driver
+  # Redis para cache de tokens
+  data:
+    redis:
+      host: redis
+      port: 6379
+      timeout: 2000ms
 
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
+  # Para comunicación con User Service
+  web:
+    client:
+      timeout:
+        connect: 5000ms
+        read: 5000ms
 
-  kafka:
-    bootstrap-servers: kafka:9092
-    consumer:
-      group-id: parking-group
-      auto-offset-reset: earliest
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+# Configuración de JWT (MISMO SECRET que en Gateway)
+jwt:
+  secret: university-parking-system-super-secret-key-256-bits-2026  # 32+ caracteres
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+# Configuración de servicios
+services:
+  user:
+    url: http://user-service:8083  # User Service en 8083
+    base-path: /api/users
 
 management:
   endpoints:

@@ -17,27 +17,55 @@ public class AuthService {
         this.jwtUtil = jwtUtil;
     }
 
-    public Map<String, String> login(String email, String password) {
-
-        // 1️⃣ Obtener usuario desde User Service
-        Map<String, Object> user = userClient.getUserByEmail(email);
-
-        if (!(Boolean) user.get("active")) {
-            throw new RuntimeException("User is inactive");
-        }
-
-        // 2️⃣ Validación simple (demo académica)
-        if (!"password".equals(password)) {
+    public Map<String, Object> login(String email, String password) {
+        // 1️⃣ Validar credenciales con User Service
+        Map<String, Object> validationResult = userClient.validateCredentials(email, password);
+        
+        if (validationResult == null || !Boolean.TRUE.equals(validationResult.get("valid"))) {
             throw new RuntimeException("Invalid credentials");
         }
 
-        // 3️⃣ Generar JWT
-        String role = (String) user.get("role");
-        String token = jwtUtil.generateToken(email, role);
+        // 2️⃣ Verificar si el usuario está activo
+        if (!Boolean.TRUE.equals(validationResult.get("active"))) {
+            throw new RuntimeException("User is inactive");
+        }
 
+        // 3️⃣ Extraer datos del usuario
+        String userId = (String) validationResult.get("userId");
+        String role = (String) validationResult.get("role");
+        String userEmail = (String) validationResult.get("email");
+
+        // 4️⃣ Generar tokens
+        String accessToken = jwtUtil.generateAccessToken(userEmail, role, userId);
+        String refreshToken = jwtUtil.generateRefreshToken(userEmail, userId);
+
+        // 5️⃣ Retornar respuesta
         return Map.of(
-                "token", token,
-                "role", role
+            "accessToken", accessToken,
+            "refreshToken", refreshToken,
+            "tokenType", "Bearer",
+            "expiresIn", 86400000,
+            "role", role,
+            "userId", userId,
+            "email", userEmail,
+            "message", "Login successful"
         );
+    }
+
+    public Map<String, Object> validateToken(String token) {
+        try {
+            String userId = jwtUtil.extractUserId(token);
+            String email = jwtUtil.extractUsername(token);
+            String role = jwtUtil.extractRole(token);
+            
+            return Map.of(
+                "valid", true,
+                "userId", userId,
+                "email", email,
+                "role", role
+            );
+        } catch (Exception e) {
+            return Map.of("valid", false, "error", e.getMessage());
+        }
     }
 }

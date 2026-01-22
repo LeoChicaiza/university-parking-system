@@ -1,12 +1,25 @@
-server:
+﻿server:
   port: 8080
 
 spring:
   application:
     name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,gateway,routes
+  endpoint:
+    gateway:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.university.parking.gateway: DEBUG

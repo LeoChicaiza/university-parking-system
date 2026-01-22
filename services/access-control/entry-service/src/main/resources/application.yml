@@ -1,5 +1,5 @@
 server:
-  port: 8085
+  port: 8090
 
 spring:
   application:
@@ -15,7 +15,8 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-
+    default_schema: access_domain
+    
   kafka:
     bootstrap-servers: kafka:9092
     producer:
