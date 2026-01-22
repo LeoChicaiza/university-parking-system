@@ -1,15 +1,14 @@
 package com.university.parking.space.model;
 
 import jakarta.persistence.*;
-import java.util.UUID;
 
 @Entity
-@Table(name = "parking_spaces", schema = "core_domain")  // Agregado schema
+@Table(name = "parking_spaces", schema = "core_domain")
 public class ParkingSpace {
 
     @Id
-    @GeneratedValue
-    private UUID id;  // Cambiado a UUID
+    @Column(name = "id", nullable = false, updatable = false)
+    private String id;   // ✅ String, como espera el test
 
     @Column(name = "lot_id", nullable = false)
     private String lotId;
@@ -18,16 +17,27 @@ public class ParkingSpace {
     private boolean occupied;
 
     @Column(name = "space_number", nullable = false)
-    private String spaceNumber;  // Agregado para identificar el espacio
+    private String spaceNumber;
 
     @Column(name = "vehicle_plate")
-    private String vehiclePlate;  // Agregado para saber qué vehículo ocupa
+    private String vehiclePlate;
 
     protected ParkingSpace() {
         // JPA
     }
 
-    public ParkingSpace(String lotId, String spaceNumber) {
+    // ✅ Constructor usado por TEST
+    public ParkingSpace(String id, String lotId) {
+        this.id = id;
+        this.lotId = lotId;
+        this.spaceNumber = id; // coherente con el dominio
+        this.occupied = false;
+        this.vehiclePlate = null;
+    }
+
+    // Constructor alternativo si lo necesitas
+    public ParkingSpace(String id, String lotId, String spaceNumber) {
+        this.id = id;
         this.lotId = lotId;
         this.spaceNumber = spaceNumber;
         this.occupied = false;
@@ -35,30 +45,28 @@ public class ParkingSpace {
     }
 
     public boolean occupy(String vehiclePlate) {
-        if (occupied) {
-            return false;
-        }
-        occupied = true;
+        if (occupied) return false;
+        this.occupied = true;
         this.vehiclePlate = vehiclePlate;
         return true;
     }
 
     public void release() {
-        occupied = false;
+        this.occupied = false;
         this.vehiclePlate = null;
     }
 
     // Getters
-    public UUID getId() {
+    public String getId() {
         return id;
-    }
-
-    public boolean isOccupied() {
-        return occupied;
     }
 
     public String getLotId() {
         return lotId;
+    }
+
+    public boolean isOccupied() {
+        return occupied;
     }
 
     public String getSpaceNumber() {
@@ -70,7 +78,7 @@ public class ParkingSpace {
     }
 
     // Setters
-    public void setId(UUID id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -88,10 +96,5 @@ public class ParkingSpace {
 
     public void setVehiclePlate(String vehiclePlate) {
         this.vehiclePlate = vehiclePlate;
-    }
-
-    // Método adicional si necesitas
-    public boolean getAvailable() {
-        return !occupied;
     }
 }
