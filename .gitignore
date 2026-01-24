@@ -16,3 +16,26 @@ target/
 .terraform/
 *.tfstate
 *.tfstate.backup
+
+# Variables
+.env
+
+# Terraform secrets
+*.auto.tfvars
+secrets.tfvars
+terraform.tfvars
+
+# Environment variables
+.env.local
+.env.*.local
+
+# Secrets
+*.secret
+*.key
+*.pem
+credentials
+secrets.*
+
+# Terraform state
+*.tfstate.*
+terraform.tfstate
