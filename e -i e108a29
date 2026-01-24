@@ -1,0 +1,47 @@
+[33m87252f9[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mQA[m[33m)[m feat: infraestructura Terraform sin secrets en qa.tfvars
+[33m03c698e[m terraform apply and tests
+[33m7ee4e21[m terraform apply and tests
+[33me108a29[m[33m ([m[1;31morigin/QA[m[33m)[m Correction
+[33md678c77[m Correction fails V3
+[33m71ce682[m Correction fails v2
+[33mfdc0f54[m Correction fails
+[33m454cd85[m Supabase implementation in the access-control domain v3
+[33m1c318ad[m Supabase implementation in the access-control domain v2
+[33m6debe35[m Supabase implementation in the access-control domain
+[33m79955db[m correction workflows vehicle 2.1
+[33m085256e[m correction workflows vehicle 2
+[33m61ad26f[m correction workflows vehicle
+[33m4f49167[m correction workflows security 2.2
+[33m4de99a6[m correction workflows security 2.1
+[33m7a7ce26[m correction workflows security 2
+[33m1732828[m correction workflows security
+[33md203931[m correction workflows access-control
+[33m3af91bb[m correction workflows
+[33m8a3dc04[m correction workflows
+[33m5c01344[m correction workflows
+[33m2d8a239[m correction workflows
+[33m33a2470[m correction workflows
+[33md2c67c5[m correction workflows
+[33m81f58a5[m correction workflows
+[33mde3f437[m correction workflows
+[33m0e186d0[m correction workflows
+[33md8508fa[m correction workflows
+[33mbb5f280[m correction api-gateway 2
+[33m4a132be[m correction api-gateway 2
+[33mdea2b6c[m correction api-gateway 2
+[33m4ea32eb[m correction api-gateway 2
+[33med2cd84[m correction api-gateway
+[33m48841d3[m Add unit tests services
+[33m286cbd6[m Add api-gateway 2.0
+[33m8dabad5[m Add api-gateway
+[33m311953a[m fix: remove docker tokens from terraform variables
+[33mac9d2bf[m fix: remove docker tokens from terraform variables
+[33m8008c5b[m Actualizar configuración de Terraform y workflows - Renombrar provider.tf a providers.tf - Actualizar variables de entorno y grupos de seguridad - Eliminar respaldos antiguos de estado de Terraform - Agregar archivos package.json para servicios
+[33m0ec161a[m Actualizar configuración de Terraform y workflows - Renombrar provider.tf a providers.tf - Actualizar variables de entorno y grupos de seguridad - Eliminar respaldos antiguos de estado de Terraform - Agregar archivos package.json para servicios
+[33m18023a4[m Changes are being added to the parking system-banckend
+[33m2631422[m Changes are being added to the parking system-banckend
+[33mdea9ecf[m Changes are being added to the parking system
+[33m60eb948[m Changes are being added to the parking system
+[33mcdc259d[m Changes are being added to the parking system
+[33m5f433f9[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m services
+[33m5735088[m chore: initial monorepo structure for university parking system

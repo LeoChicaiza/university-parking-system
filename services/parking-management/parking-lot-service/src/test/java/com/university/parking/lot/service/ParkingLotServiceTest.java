@@ -2,7 +2,6 @@ package com.university.parking.lot.service;
 
 import com.university.parking.lot.model.ParkingLot;
 import com.university.parking.lot.repository.ParkingLotRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,11 +26,10 @@ class ParkingLotServiceTest {
     private final UUID testLotId = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
     private final String testLotIdString = "123e4567-e89b-12d3-a456-426614174000";
 
-    @BeforeEach void setUp() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-    }
-
     @Test void occupy_WhenSpaceAvailable_ShouldOccupySuccessfully() {
+        // Configurar el mock de RedisTemplate solo para este test
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
         String capacityKey = "parking-lot:" + testLotIdString + ":capacity";
         String occupiedKey = "parking-lot:" + testLotIdString + ":occupied";
         
@@ -53,6 +51,9 @@ class ParkingLotServiceTest {
     }
 
     @Test void occupy_WhenLotIsFull_ShouldThrowException() {
+        // Configurar el mock de RedisTemplate solo para este test
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
         String capacityKey = "parking-lot:" + testLotIdString + ":capacity";
         String occupiedKey = "parking-lot:" + testLotIdString + ":occupied";
         
@@ -71,6 +72,9 @@ class ParkingLotServiceTest {
     }
 
     @Test void occupy_WhenCapacityNotSetInRedis_ShouldThrowException() {
+        // Configurar el mock de RedisTemplate solo para este test
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
         String capacityKey = "parking-lot:" + testLotIdString + ":capacity";
         String occupiedKey = "parking-lot:" + testLotIdString + ":occupied";
         
@@ -89,6 +93,9 @@ class ParkingLotServiceTest {
     }
 
     @Test void release_ShouldDecrementOccupancy() {
+        // Configurar el mock de RedisTemplate solo para este test
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
         String occupiedKey = "parking-lot:" + testLotIdString + ":occupied";
         
         ParkingLot parkingLot = new ParkingLot("Main Lot", 100);
@@ -106,6 +113,9 @@ class ParkingLotServiceTest {
     }
 
     @Test void release_WhenOccupancyNegative_ShouldSetToZero() {
+        // Configurar el mock de RedisTemplate solo para este test
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
         String occupiedKey = "parking-lot:" + testLotIdString + ":occupied";
         
         ParkingLot parkingLot = new ParkingLot("Main Lot", 100);
@@ -124,6 +134,9 @@ class ParkingLotServiceTest {
     }
 
     @Test void createParkingLot_ShouldCreateAndInitializeRedis() {
+        // Configurar el mock de RedisTemplate solo para este test
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        
         String name = "Test Lot";
         int capacity = 50;
         
@@ -149,6 +162,8 @@ class ParkingLotServiceTest {
     }
 
     @Test void getParkingLot_WhenExists_ShouldReturnLot() {
+        // NO se configura redisTemplate.opsForValue() aquí porque este test no lo usa
+        
         ParkingLot expectedLot = new ParkingLot("Main Lot", 100);
         expectedLot.setId(testLotId);
         
@@ -159,9 +174,12 @@ class ParkingLotServiceTest {
         assertNotNull(result);
         assertEquals(expectedLot.getId(), result.getId());
         verify(repository, times(1)).findById(testLotIdString);
+        // No se verifica redisTemplate porque no se usa en este método
     }
 
     @Test void getParkingLot_WhenNotExists_ShouldThrowException() {
+        // NO se configura redisTemplate.opsForValue() aquí porque este test no lo usa
+        
         when(repository.findById(testLotIdString)).thenReturn(Optional.empty());
 
         RuntimeException exception = assertThrows(RuntimeException.class,
@@ -169,5 +187,6 @@ class ParkingLotServiceTest {
         
         assertEquals("Lot not found: " + testLotIdString, exception.getMessage());
         verify(repository, times(1)).findById(testLotIdString);
+        // No se verifica redisTemplate porque no se usa en este método
     }
 }
