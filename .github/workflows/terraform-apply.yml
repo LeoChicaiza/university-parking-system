@@ -2,7 +2,7 @@ name: 'Terraform Apply - QA Environment'
 
 on:
   push:
-    branches: [ QA ]
+    branches: [ main ]
     paths:
       - 'infrastructure/terraform/**'
 
@@ -37,41 +37,27 @@ jobs:
     - name: Create Dynamic Key Pair for QA
       id: create-key
       run: |
-        # Crear nombre único para key pair
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
         KEY_NAME="parking-qa-key-$TIMESTAMP"
         
-        # Crear key pair en AWS
         aws ec2 create-key-pair \
           --key-name "$KEY_NAME" \
           --query 'KeyMaterial' \
           --output text > "$KEY_NAME.pem"
         
-        # Establecer permisos correctos (en Linux)
         chmod 400 "$KEY_NAME.pem"
-        
-        # Guardar key name para uso posterior
         echo "KEY_NAME=$KEY_NAME" >> $GITHUB_ENV
         echo "key_name=$KEY_NAME" >> $GITHUB_OUTPUT
-        
-        # Opcional: subir el .pem como artifact (solo para debugging)
-        # echo "PEM_FILE=$KEY_NAME.pem" >> $GITHUB_ENV
     
     - name: Update QA Variables with Dynamic Key
       run: |
-        # Crear versión temporal de qa.tfvars con key dinámica
         cp qa.tfvars qa-dynamic.tfvars
-        
-        # Actualizar key_name en el archivo temporal
         sed -i "s/key_name *= *\".*\"/key_name = \"$KEY_NAME\"/g" qa-dynamic.tfvars
-        
-        # Mostrar cambios
         echo "=== QA Configuration ==="
         grep -E "(key_name|environment|account_id)" qa-dynamic.tfvars
       
     - name: Terraform Apply for QA
-      run: |
-        terraform apply -auto-approve -var-file="qa-dynamic.tfvars"
+      run: terraform apply -auto-approve -var-file="qa-dynamic.tfvars"
       
     - name: Save Terraform Outputs
       run: terraform output -json > terraform-outputs.json
