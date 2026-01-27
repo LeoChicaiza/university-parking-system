@@ -2,10 +2,19 @@ name: 'Terraform Apply - QA Environment'
 
 on:
   push:
-    branches: [ "QA", "main" ]  # ← CON comillas y ambas ramas
+    branches: [ "QA", "main" ]
     paths:
       - 'infrastructure/terraform/**'
   workflow_dispatch:
+    inputs:
+      account_id:
+        description: 'AWS Account ID (optional)'
+        required: false
+        default: ''
+      environment:
+        description: 'Environment name'
+        required: false
+        default: 'qa'
 
 jobs:
   terraform-apply:
@@ -16,7 +25,7 @@ jobs:
         working-directory: ./infrastructure/terraform
     
     steps:
-    - name: Checkout
+    - name: Checkout repository
       uses: actions/checkout@v4
     
     - name: Setup Terraform
@@ -32,15 +41,32 @@ jobs:
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
     
+    - name: Verify AWS Account
+      id: verify-aws
+      run: |
+        echo "=== Verifying AWS Credentials ==="
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        echo "AWS Account ID: $ACCOUNT_ID"
+        echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+        
+        # Update qa.tfvars with current account ID
+        if [ -f "qa.tfvars" ]; then
+          sed -i "s/account_id *= *\".*\"/account_id = \"$ACCOUNT_ID\"/g" qa.tfvars
+          echo "✅ Updated qa.tfvars with account ID: $ACCOUNT_ID"
+        fi
+    
     - name: Terraform Init
+      id: init
       run: terraform init
       
     - name: Create Dynamic Key Pair for QA
       id: create-key
       run: |
+        echo "=== Creating SSH Key Pair ==="
         TIMESTAMP=$(date +%Y%m%d%H%M%S)
         KEY_NAME="parking-qa-key-$TIMESTAMP"
         
+        echo "Creating key pair: $KEY_NAME"
         aws ec2 create-key-pair \
           --key-name "$KEY_NAME" \
           --query 'KeyMaterial' \
@@ -49,33 +75,87 @@ jobs:
         chmod 400 "$KEY_NAME.pem"
         echo "KEY_NAME=$KEY_NAME" >> $GITHUB_ENV
         echo "key_name=$KEY_NAME" >> $GITHUB_OUTPUT
+        echo "✅ Key pair created: $KEY_NAME"
+        echo "📄 Key file: $KEY_NAME.pem (saved for debugging)"
     
     - name: Update QA Variables with Dynamic Key
+      id: update-vars
       run: |
+        echo "=== Updating QA Configuration ==="
+        
+        # Create a backup of original
+        cp qa.tfvars qa.tfvars.backup
+        
+        # Create dynamic version
         cp qa.tfvars qa-dynamic.tfvars
+        
+        # Update key_name
         sed -i "s/key_name *= *\".*\"/key_name = \"$KEY_NAME\"/g" qa-dynamic.tfvars
-        echo "=== QA Configuration ==="
-        grep -E "(key_name|environment|account_id)" qa-dynamic.tfvars
+        
+        # Update account_id if from verification step
+        if [ -n "${{ steps.verify-aws.outputs.account_id }}" ]; then
+          sed -i "s/account_id *= *\".*\"/account_id = \"${{ steps.verify-aws.outputs.account_id }}\"/g" qa-dynamic.tfvars
+        fi
+        
+        echo "✅ Configuration updated:"
+        echo "=== Final QA Configuration ==="
+        grep -E "(key_name|environment|account_id|aws_region)" qa-dynamic.tfvars
       
     - name: Terraform Apply for QA
-      run: terraform apply -auto-approve -var-file="qa-dynamic.tfvars"
+      id: apply
+      run: |
+        echo "=== Applying Terraform Configuration ==="
+        echo "Using variables file: qa-dynamic.tfvars"
+        echo "Key pair: $KEY_NAME"
+        
+        terraform apply -auto-approve -var-file="qa-dynamic.tfvars"
+        
+        echo "✅ Terraform apply completed successfully!"
       
     - name: Save Terraform Outputs
-      run: terraform output -json > terraform-outputs.json
+      id: outputs
+      run: |
+        echo "=== Saving Terraform Outputs ==="
+        terraform output -json > terraform-outputs.json
+        echo "📊 Outputs saved to terraform-outputs.json"
+        
+        # Also save human readable version
+        terraform output > terraform-outputs.txt
+        cat terraform-outputs.txt
       
     - name: Upload Outputs as Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: terraform-outputs-qa
-        path: infrastructure/terraform/terraform-outputs.json
+        name: terraform-outputs-qa-${{ github.run_id }}
+        path: |
+          infrastructure/terraform/terraform-outputs.json
+          infrastructure/terraform/terraform-outputs.txt
+          infrastructure/terraform/qa-dynamic.tfvars
+        retention-days: 7
         
-    - name: Display Outputs
+    - name: Display Deployment Summary
       run: |
-        echo "=== TERRAFORM OUTPUTS ==="
-        terraform output
+        echo "=========================================="
+        echo "🚀 TERRAFORM DEPLOYMENT SUCCESSFUL! 🚀"
+        echo "=========================================="
         echo ""
-        echo "=== ALB DNS ==="
+        echo "📡 LOAD BALANCER:"
         terraform output alb_dns
         echo ""
-        echo "=== Bastion IP ==="
+        echo "🖥️  BASTION HOST:"
         terraform output bastion_ip
+        echo ""
+        echo "🔑 SSH KEY PAIR: $KEY_NAME"
+        echo ""
+        echo "🌐 AWS ACCOUNT: ${{ steps.verify-aws.outputs.account_id }}"
+        echo ""
+        echo "✅ INFRASTRUCTURE READY FOR MICROSERVICES"
+        echo "=========================================="
+      
+    - name: Save Key Pair as Artifact (Debug)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ssh-key-pair-qa-${{ github.run_id }}
+        path: infrastructure/terraform/*.pem
+        retention-days: 1
