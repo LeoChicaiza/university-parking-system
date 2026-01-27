@@ -2,14 +2,14 @@
 # ENVIRONMENT & ACCOUNT
 # ==========================
 environment = "qa"
-account_id  = "506474937999"  # Tu cuenta actual de QA
-assume_role_arn = ""  # Vacío para QA (misma cuenta)
+account_id  = "445408867885"  
+assume_role_arn = ""  
 
 # ==========================
 # BACKEND CONFIGURATION
 # ==========================
-backend_bucket = "terraform-state-qa-506474937999"
-aws_profile = "qa" 
+backend_bucket = "terraform-state-qa-445408867885"
+aws_profile = "" 
 
 # ==========================
 # PROJECT METADATA

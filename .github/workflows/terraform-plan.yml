@@ -1,0 +1,44 @@
+name: 'Terraform Plan - QA Environment'
+
+on:
+  pull_request:
+    branches: [ QA ]
+    paths:
+      - 'infrastructure/terraform/**'
+
+jobs:
+  terraform-plan:
+    name: 'Terraform Plan - QA'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: '1.6.0'
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+    
+    - name: Terraform Init
+      run: terraform init
+      
+    - name: Terraform Format Check
+      run: terraform fmt -check
+      
+    - name: Terraform Validate
+      run: terraform validate
+      
+    - name: Terraform Plan for QA
+      run: terraform plan -var-file="qa.tfvars"
