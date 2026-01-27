@@ -2,7 +2,7 @@ name: 'Terraform Plan - QA Environment'
 
 on:
   pull_request:
-    branches: [ QA ]
+    branches: [ "QA", "main" ]  # ← CON comillas y ambas ramas
     paths:
       - 'infrastructure/terraform/**'
 

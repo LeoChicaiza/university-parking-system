@@ -2,9 +2,10 @@ name: 'Terraform Apply - QA Environment'
 
 on:
   push:
-    branches: [ QA ]
+    branches: [ "QA", "main" ]  # ← CON comillas y ambas ramas
     paths:
       - 'infrastructure/terraform/**'
+  workflow_dispatch:
 
 jobs:
   terraform-apply:
