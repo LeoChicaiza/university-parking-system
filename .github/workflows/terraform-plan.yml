@@ -2,7 +2,7 @@ name: 'Terraform Plan - QA Environment'
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ QA ]
     paths:
       - 'infrastructure/terraform/**'
 

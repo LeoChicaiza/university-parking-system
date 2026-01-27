@@ -2,7 +2,7 @@ name: 'Terraform Apply - QA Environment'
 
 on:
   push:
-    branches: [ main ]
+    branches: [ QA ]
     paths:
       - 'infrastructure/terraform/**'
 
