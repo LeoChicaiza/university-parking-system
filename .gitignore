@@ -39,3 +39,11 @@ secrets.*
 # Terraform state
 *.tfstate.*
 terraform.tfstate
+
+# Terraform
+.terraform/
+*.tfplan
+*.pem
+*.key
+
+

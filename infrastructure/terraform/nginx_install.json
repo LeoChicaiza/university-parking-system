@@ -1,0 +1,11 @@
+{
+  "commands": [
+    "yum install -y nginx --disablerepo=\"*\" --enablerepo=\"amzn2-core\" || amazon-linux-extras install -y nginx1",
+    "systemctl start nginx",
+    "systemctl enable nginx",
+    "echo 'server { listen 80; location /health { return 200 \"{\\\"status\\\":\\\"UP\\\"}\"; add_header Content-Type application/json; } }' > /etc/nginx/conf.d/health.conf",
+    "systemctl restart nginx",
+    "sleep 5",
+    "curl http://localhost/health || echo READY"
+  ]
+}

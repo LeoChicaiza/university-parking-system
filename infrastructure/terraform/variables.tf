@@ -30,6 +30,7 @@ variable "dockerhub_token" {
   description = "DockerHub access token"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 # =====================================================
@@ -193,4 +194,21 @@ variable "aws_profile" {
   description = "AWS CLI profile name"
   type        = string
   default     = "default"
+}
+
+
+# =====================================================
+# API GATEWAY CONFIGURATION
+# =====================================================
+
+variable "api_gateway_cors_origins" {
+  description = "CORS allowed origins for API Gateway"
+  type        = list(string)
+  default     = ["*"]  # En producción, cambia a tu dominio
+}
+
+variable "api_gateway_log_retention" {
+  description = "CloudWatch log retention in days for API Gateway"
+  type        = number
+  default     = 7
 }

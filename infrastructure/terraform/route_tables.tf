@@ -19,7 +19,7 @@ resource "aws_route_table" "public_rt" {
 # -------------------------
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public_alb.id  # Debe estar en subnet pública
+  subnet_id     = aws_subnet.public_alb.id  
 
   tags = merge(local.common_tags, {
     Name = "nat-gw-${local.environment}"

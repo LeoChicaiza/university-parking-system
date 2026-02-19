@@ -1,161 +1,292 @@
 name: 'Terraform Apply - QA Environment'
 
 on:
-  push:
-    branches: [ "QA", "main" ]
-    paths:
-      - 'infrastructure/terraform/**'
   workflow_dispatch:
     inputs:
-      account_id:
-        description: 'AWS Account ID (optional)'
-        required: false
+      plan_run_id:
+        description: 'ID del workflow de Plan (ej: 1234567890)'
+        required: true
         default: ''
-      environment:
-        description: 'Environment name'
-        required: false
-        default: 'qa'
+        type: string
+      auto_approve:
+        description: 'Aplicar automáticamente?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   terraform-apply:
     name: 'Terraform Apply - QA'
     runs-on: ubuntu-latest
+    
     defaults:
       run:
         working-directory: ./infrastructure/terraform
+        shell: bash
     
     steps:
-    - name: Checkout repository
+    # ========== PASO 1: CHECKOUT ==========
+    - name: Checkout QA Branch
       uses: actions/checkout@v4
+      with:
+        ref: QA
+        fetch-depth: 0
     
+    # ========== PASO 2: CONFIGURAR TERRAFORM ==========
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: '1.6.0'
+        terraform_wrapper: false
     
+    # ========== PASO 3: CONFIGURAR AWS ==========
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v3
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: us-east-1
     
-    - name: Verify AWS Account
-      id: verify-aws
+    # ========== PASO 4: VERIFICAR RUN ID ==========
+    - name: Verify Plan Run ID
+      id: verify-run-id
       run: |
-        echo "=== Verifying AWS Credentials ==="
-        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        echo "AWS Account ID: $ACCOUNT_ID"
-        echo "account_id=$ACCOUNT_ID" >> $GITHUB_OUTPUT
+        echo "=== Verificando Run ID ==="
         
-        # Update qa.tfvars with current account ID
-        if [ -f "qa.tfvars" ]; then
-          sed -i "s/account_id *= *\".*\"/account_id = \"$ACCOUNT_ID\"/g" qa.tfvars
-          echo "✅ Updated qa.tfvars with account ID: $ACCOUNT_ID"
+        RUN_ID="${{ inputs.plan_run_id }}"
+        
+        if [ -z "$RUN_ID" ]; then
+          echo "❌ ERROR: Debes proporcionar un plan_run_id"
+          echo ""
+          echo "📋 Cómo obtenerlo:"
+          echo "   1. Ve a GitHub Actions"
+          echo "   2. Busca 'Terraform Plan - QA Environment'"
+          echo "   3. Copia el número del run"
+          echo "   4. Ejemplo: 1234567890"
+          exit 1
         fi
+        
+        # Verificar que sea numérico
+        if ! echo "$RUN_ID" | grep -qE '^[0-9]+$'; then
+          echo "❌ ERROR: El Run ID debe ser numérico"
+          echo "   Recibido: '$RUN_ID'"
+          exit 1
+        fi
+        
+        echo "✅ Run ID válido: $RUN_ID"
+        echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "🔗 Plan original:"
+        echo "   https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
     
+    # ========== PASO 5: DESCARGAR ARTIFACT ==========
+    - name: Download Plan Artifact
+      id: download-plan
+      uses: actions/download-artifact@v4
+      with:
+        name: terraform-plan-qa-${{ inputs.plan_run_id }}
+        path: .
+    
+    # ========== PASO 6: VERIFICAR ARCHIVOS ==========
+    - name: Verify Downloaded Files
+      id: verify-files
+      run: |
+        echo "=== Verificando archivos ==="
+        
+        if [ ! -f "tfplan.binary" ]; then
+          echo "❌ ERROR: No se encontró tfplan.binary"
+          echo ""
+          echo "📁 Archivos actuales:"
+          ls -la
+          echo ""
+          echo "🔍 Posibles problemas:"
+          echo "   • Run ID incorrecto"
+          echo "   • Artifact expirado (7 días)"
+          echo "   • El plan no se generó correctamente"
+          exit 1
+        fi
+        
+        echo "✅ Archivos encontrados:"
+        ls -la tfplan.*
+        
+        echo ""
+        echo "📋 Resumen del plan:"
+        echo "-------------------"
+        terraform show tfplan.binary | grep -E "(Plan:|to add|to change|to destroy)" || true
+        echo "-------------------"
+    
+    # ========== PASO 7: INICIALIZAR TERRAFORM ==========
     - name: Terraform Init
       id: init
-      run: terraform init
-      
-    - name: Create Dynamic Key Pair for QA
-      id: create-key
       run: |
-        echo "=== Creating SSH Key Pair ==="
-        TIMESTAMP=$(date +%Y%m%d%H%M%S)
-        KEY_NAME="parking-qa-key-$TIMESTAMP"
+        echo "=== Inicializando Terraform ==="
         
-        echo "Creating key pair: $KEY_NAME"
-        aws ec2 create-key-pair \
-          --key-name "$KEY_NAME" \
-          --query 'KeyMaterial' \
-          --output text > "$KEY_NAME.pem"
+        terraform init -input=false
         
-        chmod 400 "$KEY_NAME.pem"
-        echo "KEY_NAME=$KEY_NAME" >> $GITHUB_ENV
-        echo "key_name=$KEY_NAME" >> $GITHUB_OUTPUT
-        echo "✅ Key pair created: $KEY_NAME"
-        echo "📄 Key file: $KEY_NAME.pem (saved for debugging)"
-    
-    - name: Update QA Variables with Dynamic Key
-      id: update-vars
-      run: |
-        echo "=== Updating QA Configuration ==="
-        
-        # Create a backup of original
-        cp qa.tfvars qa.tfvars.backup
-        
-        # Create dynamic version
-        cp qa.tfvars qa-dynamic.tfvars
-        
-        # Update key_name
-        sed -i "s/key_name *= *\".*\"/key_name = \"$KEY_NAME\"/g" qa-dynamic.tfvars
-        
-        # Update account_id if from verification step
-        if [ -n "${{ steps.verify-aws.outputs.account_id }}" ]; then
-          sed -i "s/account_id *= *\".*\"/account_id = \"${{ steps.verify-aws.outputs.account_id }}\"/g" qa-dynamic.tfvars
+        if [ $? -eq 0 ]; then
+          echo "✅ Terraform init exitoso"
+        else
+          echo "❌ Terraform init falló"
+          exit 1
         fi
-        
-        echo "✅ Configuration updated:"
-        echo "=== Final QA Configuration ==="
-        grep -E "(key_name|environment|account_id|aws_region)" qa-dynamic.tfvars
-      
-    - name: Terraform Apply for QA
+    
+    # ========== PASO 8: APLICAR EL PLAN ==========
+    - name: Terraform Apply
       id: apply
       run: |
-        echo "=== Applying Terraform Configuration ==="
-        echo "Using variables file: qa-dynamic.tfvars"
-        echo "Key pair: $KEY_NAME"
+        echo "========================================"
+        echo "🚀 TERRAFORM APPLY - QA"
+        echo "========================================"
+        echo ""
+        echo "📅 Inicio: $(date)"
+        echo "🆔 Plan Run ID: ${{ inputs.plan_run_id }}"
+        echo "👤 Usuario: ${{ github.actor }}"
+        echo "🔓 Auto-approve: ${{ inputs.auto_approve }}"
+        echo ""
         
-        terraform apply -auto-approve -var-file="qa-dynamic.tfvars"
+        if [ "${{ inputs.auto_approve }}" = "false" ]; then
+          echo "⏸️  MODO: REQUIERE CONFIRMACIÓN"
+          echo ""
+          echo "Para aplicar este plan:"
+          echo "   1. Re-ejecuta este workflow"
+          echo "   2. Establece 'auto_approve: true'"
+          echo "   3. Usa el mismo plan_run_id"
+          echo ""
+          echo "📋 Plan completo:"
+          echo "----------------"
+          terraform show tfplan.binary
+          echo "----------------"
+          exit 0
+        fi
         
-        echo "✅ Terraform apply completed successfully!"
-      
-    - name: Save Terraform Outputs
+        echo "✅ MODO: AUTO-APPROVE ACTIVADO"
+        echo ""
+        echo "⏰ Aplicando cambios..."
+        
+        terraform apply -input=false -auto-approve tfplan.binary
+        
+        if [ $? -eq 0 ]; then
+          echo ""
+          echo "✅ ✅ ✅ APPLY EXITOSO ✅ ✅ ✅"
+        else
+          echo ""
+          echo "❌ ❌ ❌ APPLY FALLIDO ❌ ❌ ❌"
+          exit 1
+        fi
+        
+        echo ""
+        echo "📅 Fin: $(date)"
+        echo "========================================"
+    
+    # ========== PASO 9: OBTENER OUTPUTS ==========
+    - name: Get Terraform Outputs
+      if: steps.apply.outcome == 'success'
       id: outputs
       run: |
-        echo "=== Saving Terraform Outputs ==="
+        echo "=== Obteniendo outputs ==="
+        
+        # Guardar outputs
         terraform output -json > terraform-outputs.json
-        echo "📊 Outputs saved to terraform-outputs.json"
-        
-        # Also save human readable version
         terraform output > terraform-outputs.txt
-        cat terraform-outputs.txt
-      
-    - name: Upload Outputs as Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: terraform-outputs-qa-${{ github.run_id }}
-        path: |
-          infrastructure/terraform/terraform-outputs.json
-          infrastructure/terraform/terraform-outputs.txt
-          infrastructure/terraform/qa-dynamic.tfvars
-        retention-days: 7
         
-    - name: Display Deployment Summary
-      run: |
-        echo "=========================================="
-        echo "🚀 TERRAFORM DEPLOYMENT SUCCESSFUL! 🚀"
-        echo "=========================================="
+        # Extraer valores
+        ALB_DNS=$(terraform output -raw alb_dns 2>/dev/null || echo "No disponible")
+        BASTION_IP=$(terraform output -raw bastion_ip 2>/dev/null || echo "No disponible")
+        
+        echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+        echo "bastion_ip=$BASTION_IP" >> $GITHUB_OUTPUT
+        
         echo ""
-        echo "📡 LOAD BALANCER:"
-        terraform output alb_dns
-        echo ""
-        echo "🖥️  BASTION HOST:"
-        terraform output bastion_ip
-        echo ""
-        echo "🔑 SSH KEY PAIR: $KEY_NAME"
-        echo ""
-        echo "🌐 AWS ACCOUNT: ${{ steps.verify-aws.outputs.account_id }}"
-        echo ""
-        echo "✅ INFRASTRUCTURE READY FOR MICROSERVICES"
-        echo "=========================================="
-      
-    - name: Save Key Pair as Artifact (Debug)
-      if: always()
+        echo "📊 Outputs principales:"
+        echo "-----------------------"
+        echo "Load Balancer: $ALB_DNS"
+        echo "Bastion Host:  $BASTION_IP"
+        echo "-----------------------"
+        
+        # Crear resumen
+        echo "# Aplicación completada - QA" > apply-summary.md
+        echo "" >> apply-summary.md
+        echo "**Fecha:** $(date)" >> apply-summary.md
+        echo "**Apply Run ID:** ${{ github.run_id }}" >> apply-summary.md
+        echo "**Plan Run ID:** ${{ inputs.plan_run_id }}" >> apply-summary.md
+        echo "" >> apply-summary.md
+        echo "## Endpoints:" >> apply-summary.md
+        echo "" >> apply-summary.md
+        echo "- **ALB DNS:** \`$ALB_DNS\`" >> apply-summary.md
+        echo "- **Bastion IP:** \`$BASTION_IP\`" >> apply-summary.md
+        echo "" >> apply-summary.md
+        echo "## Comandos:" >> apply-summary.md
+        echo "\`\`\`bash" >> apply-summary.md
+        echo "ssh -i parking-qa-key.pem ec2-user@$BASTION_IP" >> apply-summary.md
+        echo "\`\`\`" >> apply-summary.md
+    
+    # ========== PASO 10: SUBIR RESULTADOS ==========
+    - name: Upload Apply Results
+      if: steps.apply.outcome == 'success'
       uses: actions/upload-artifact@v4
       with:
-        name: ssh-key-pair-qa-${{ github.run_id }}
-        path: infrastructure/terraform/*.pem
-        retention-days: 1
+        name: terraform-apply-results-${{ github.run_id }}
+        path: |
+          terraform-outputs.json
+          terraform-outputs.txt
+          apply-summary.md
+        retention-days: 30
+    
+    # ========== PASO 11: LIMPIAR ==========
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "=== Limpieza ==="
+        rm -f tfplan.* plan-summary.md 2>/dev/null || true
+        echo "✅ Archivos temporales eliminados"
+    
+    # ========== PASO 12: RESUMEN FINAL ==========
+    - name: Apply Summary
+      if: always()
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "📋 RESUMEN - TERRAFORM APPLY QA"
+        echo "=========================================="
+        echo ""
+        echo "📅 Fecha: $(date)"
+        echo "🆔 Apply Run ID: ${{ github.run_id }}"
+        echo "📋 Plan Run ID: ${{ inputs.plan_run_id }}"
+        echo "👤 Ejecutado por: ${{ github.actor }}"
+        echo ""
+        
+        if [ "${{ steps.apply.outcome }}" = "success" ]; then
+          echo "✅ ✅ ✅ APPLY COMPLETADO ✅ ✅ ✅"
+          echo ""
+          echo "🎉 Infraestructura QA actualizada"
+          echo ""
+          echo "🌐 Endpoints:"
+          echo "   • Load Balancer: ${{ steps.outputs.outputs.alb_dns }}"
+          echo "   • Bastion Host: ${{ steps.outputs.outputs.bastion_ip }}"
+          echo ""
+          echo "📦 Outputs guardados en artifacts"
+          
+        elif [ "${{ inputs.auto_approve }}" = "false" ]; then
+          echo "⏸️  APPLY PAUSADO"
+          echo ""
+          echo "📋 Plan revisado pero no aplicado"
+          echo ""
+          echo "✅ Para aplicar:"
+          echo "   Re-ejecuta con auto_approve: true"
+          
+        else
+          echo "❌ APPLY FALLIDO"
+          echo ""
+          echo "🔍 Revisa los logs para errores"
+        fi
+        
+        echo ""
+        echo "=========================================="
