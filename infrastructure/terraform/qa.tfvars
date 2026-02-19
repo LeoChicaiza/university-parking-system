@@ -2,14 +2,14 @@
 # ENVIRONMENT & ACCOUNT
 # ==========================
 environment = "qa"
-account_id  = "506474937999"  # Tu cuenta actual de QA
-assume_role_arn = ""  # Vacío para QA (misma cuenta)
+account_id  = "685755358010"  
+assume_role_arn = ""  
 
 # ==========================
 # BACKEND CONFIGURATION
 # ==========================
-backend_bucket = "terraform-state-qa-506474937999"
-aws_profile = "qa" 
+backend_bucket = "terraform-state-qa-685755358010"
+aws_profile = "" 
 
 # ==========================
 # PROJECT METADATA
@@ -26,13 +26,13 @@ owner        = "DevOps"
 # ==========================
 aws_region   = "us-east-1"
 instance_type = "t3.micro"
-key_name     = "parking-qa-key"
+key_name     = "parking-qa-key2"
 
 # ==========================
 # DockerHub
 # ==========================
 dockerhub_user  = "leochicaiza"
-#dockerhub_token = "REPLACE_WITH_ENV_VAR"
+#dockerhub_token = ""
 
 # ==========================
 # SECURITY DOMAIN

@@ -1,0 +1,329 @@
+name: 'Terraform Plan - QA Environment'
+
+on:
+  pull_request:
+    branches: [ "QA" ]
+    paths:
+      - 'infrastructure/terraform/**'
+      - '.github/workflows/terraform-plan-qa.yml'
+  push:
+    branches: [ "QA" ]
+    paths:
+      - 'infrastructure/terraform/**'
+      - '.github/workflows/terraform-plan-qa.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  terraform-plan:
+    name: 'Terraform Plan - QA'
+    runs-on: ubuntu-latest
+    
+    # Solo ejecutar si es push directo o PR desde el mismo repositorio
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+        shell: bash
+    
+    steps:
+    # ========== PASO 1: CHECKOUT ==========
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    
+    # ========== PASO 2: CONFIGURAR TERRAFORM ==========
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: '1.6.0'
+        terraform_wrapper: false
+    
+    # ========== PASO 3: CONFIGURAR AWS ==========
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    # ========== PASO 4: VERIFICAR ARCHIVOS ==========
+    - name: Verify Required Files
+      run: |
+        echo "=== Verificando archivos necesarios ==="
+        
+        # Verificar que qa.tfvars existe
+        if [ ! -f "qa.tfvars" ]; then
+          echo "❌ ERROR: Archivo qa.tfvars no encontrado!"
+          echo "Archivos en el directorio:"
+          ls -la
+          exit 1
+        fi
+        
+        echo "✅ qa.tfvars encontrado"
+        echo ""
+        echo "📋 Variables en qa.tfvars:"
+        grep -v "^#" qa.tfvars | grep -v "^$" | head -10 || echo "No hay variables visibles"
+        
+        # Verificar que hay archivos .tf
+        TF_FILES_COUNT=$(find . -name "*.tf" -type f | wc -l)
+        if [ "$TF_FILES_COUNT" -eq 0 ]; then
+          echo "❌ ERROR: No se encontraron archivos .tf"
+          exit 1
+        fi
+        
+        echo "✅ Encontrados $TF_FILES_COUNT archivos .tf"
+    
+    # ========== PASO 5: INICIALIZAR TERRAFORM ==========
+    - name: Terraform Init
+      id: init
+      run: |
+        echo "=== Inicializando Terraform ==="
+        
+        terraform init -input=false
+        
+        if [ $? -eq 0 ]; then
+          echo "init_status=success" >> $GITHUB_OUTPUT
+          echo "✅ Terraform init exitoso"
+        else
+          echo "init_status=failed" >> $GITHUB_OUTPUT
+          echo "❌ Terraform init falló"
+          exit 1
+        fi
+        
+        echo ""
+        echo "📊 Terraform version:"
+        terraform version
+        echo ""
+        echo "📍 Workspace:"
+        terraform workspace show
+    
+    # ========== PASO 6: VERIFICAR FORMATO ==========
+    - name: Terraform Format Check
+      id: fmt
+      run: |
+        echo "=== Verificando formato ==="
+        
+        terraform fmt -check -recursive
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Todo el código está correctamente formateado"
+          echo "fmt_status=success" >> $GITHUB_OUTPUT
+        else
+          echo "⚠️  Algunos archivos necesitan formateo"
+          echo "Ejecuta: terraform fmt -recursive"
+          echo "fmt_status=needs_formatting" >> $GITHUB_OUTPUT
+        fi
+    
+    # ========== PASO 7: VALIDAR SINTÁXIS ==========
+    - name: Terraform Validate
+      id: validate
+      run: |
+        echo "=== Validando configuración ==="
+        
+        terraform validate
+        
+        if [ $? -eq 0 ]; then
+          echo "validate_status=success" >> $GITHUB_OUTPUT
+          echo "✅ Validación exitosa"
+        else
+          echo "validate_status=failed" >> $GITHUB_OUTPUT
+          echo "❌ Validación falló"
+          exit 1
+        fi
+    
+    # ========== PASO 8: GENERAR PLAN ==========
+    - name: Terraform Plan for QA
+      id: plan
+      run: |
+        echo "=== Generando Plan de Terraform ==="
+        echo "Usando: qa.tfvars"
+        echo ""
+        
+        terraform plan \
+          -var-file="qa.tfvars" \
+          -input=false \
+          -out=tfplan.binary \
+          -detailed-exitcode
+        
+        PLAN_EXIT_CODE=$?
+        echo "plan_exit_code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
+        
+        if [ $PLAN_EXIT_CODE -eq 0 ]; then
+          echo "✅ No se requieren cambios"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "plan_ready=false" >> $GITHUB_OUTPUT
+        elif [ $PLAN_EXIT_CODE -eq 2 ]; then
+          echo "✅ Cambios detectados"
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "plan_ready=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Error generando plan"
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "plan_ready=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+    
+    # ========== PASO 9: PROCESAR SALIDA DEL PLAN ==========
+    - name: Process Plan Output
+      if: steps.plan.outputs.plan_ready == 'true'
+      run: |
+        echo "=== Procesando salida del plan ==="
+        
+        # Convertir a JSON
+        terraform show -json tfplan.binary > tfplan.json
+        
+        # Convertir a texto
+        terraform show tfplan.binary > tfplan.txt
+        
+        # Crear resumen simple
+        echo "# Resumen del Plan - QA" > plan-summary.md
+        echo "" >> plan-summary.md
+        echo "**Run ID:** ${{ github.run_id }}" >> plan-summary.md
+        echo "**Rama:** ${{ github.ref_name }}" >> plan-summary.md
+        echo "" >> plan-summary.md
+        echo "## Cambios propuestos:" >> plan-summary.md
+        echo "\`\`\`" >> plan-summary.md
+        terraform show tfplan.binary | grep -E "(Plan:|to add|to change|to destroy)" >> plan-summary.md
+        echo "\`\`\`" >> plan-summary.md
+        
+        # Mostrar en logs
+        echo ""
+        echo "📋 RESUMEN:"
+        terraform show tfplan.binary | grep -E "(Plan:|to add|to change|to destroy)"
+    
+    # ========== PASO 10: SUBIR ARTIFACTS ==========
+    - name: Upload Plan Artifact
+      if: steps.plan.outputs.plan_ready == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-plan-qa-${{ github.run_id }}
+        path: |
+          infrastructure/terraform/tfplan.binary
+          infrastructure/terraform/tfplan.json
+          infrastructure/terraform/tfplan.txt
+          infrastructure/terraform/plan-summary.md
+        retention-days: 7
+    
+    # ========== PASO 11: COMENTAR EN PR (VERSIÓN SIMPLE Y SEGURA) ==========
+    - name: Comment Plan on PR
+      if: github.event_name == 'pull_request' && steps.plan.outputs.plan_ready == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          console.log('=== Agregando comentario al PR ===');
+          
+          try {
+            // Información básica
+            const runId = context.runId;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            const prNumber = context.issue.number;
+            const serverUrl = context.serverUrl;
+            
+            // Construir URLs
+            const actionsUrl = serverUrl + '/' + repoOwner + '/' + repoName + '/actions/runs/' + runId;
+            const workflowUrl = serverUrl + '/' + repoOwner + '/' + repoName + '/actions/workflows/terraform-apply-qa.yml';
+            
+            // Crear comentario CON concatenación simple (evita problemas de YAML)
+            const commentBody = 
+              '## 🚀 Terraform Plan - QA Environment\n\n' +
+              '✅ Plan generado exitosamente!\n\n' +
+              '### 📊 Información del plan:\n\n' +
+              '• **Run ID:** `' + runId + '`\n' +
+              '• **Estado:** Cambios detectados ✅\n\n' +
+              '### 🔗 Pasos para aplicar:\n\n' +
+              '1. **Revisa** el plan en [GitHub Actions #' + runId + '](' + actionsUrl + ')\n' +
+              '2. **Aprueba** este PR si los cambios son correctos\n' +
+              '3. **Haz merge** a la rama QA\n' +
+              '4. **Ejecuta** manualmente [Terraform Apply - QA](' + workflowUrl + ')\n' +
+              '5. **Usa el Run ID:** `' + runId + '`\n\n' +
+              '📦 **Archivos disponibles en artifacts** (7 días)\n' +
+              '🆔 **Run ID para copiar:** `' + runId + '`';
+            
+            // Publicar comentario
+            const response = await github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: repoOwner,
+              repo: repoName,
+              body: commentBody
+            });
+            
+            console.log('✅ Comentario agregado al PR');
+            console.log('🔗 URL:', response.data.html_url);
+            
+          } catch (error) {
+            console.error('❌ Error agregando comentario:', error.message);
+            
+            // Comentario mínimo de respaldo
+            try {
+              const simpleComment = 
+                '## Terraform Plan - QA\n\n' +
+                'Plan generado. Run ID: `' + context.runId + '`\n\n' +
+                'Usa este ID en Terraform Apply workflow.';
+                
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: simpleComment
+              });
+              
+              console.log('✅ Comentario simple agregado');
+            } catch (simpleError) {
+              console.error('❌ Error con comentario simple:', simpleError.message);
+            }
+          }
+    
+    # ========== PASO 12: RESUMEN FINAL ==========
+    - name: Plan Summary
+      if: always()
+      run: |
+        echo ""
+        echo "========================================"
+        echo "📋 RESUMEN - TERRAFORM PLAN QA"
+        echo "========================================"
+        echo ""
+        echo "📊 Estado: ${{ job.status }}"
+        echo "🆔 Run ID: ${{ github.run_id }}"
+        echo "🌿 Rama: ${{ github.ref_name }}"
+        echo "🎯 Evento: ${{ github.event_name }}"
+        echo ""
+        
+        if [ "${{ steps.plan.outputs.plan_ready }}" = "true" ]; then
+          echo "✅ PLAN GENERADO EXITOSAMENTE"
+          echo ""
+          echo "📦 Artifact: terraform-plan-qa-${{ github.run_id }}"
+          echo "⏳ Válido por: 7 días"
+          echo ""
+          echo "🚀 PRÓXIMOS PASOS:"
+          echo "   1. Revisa el plan en artifacts/comentario del PR"
+          echo "   2. Si está correcto, aprueba el PR"
+          echo "   3. Ejecuta 'Terraform Apply - QA' con Run ID:"
+          echo ""
+          echo "      ${{ github.run_id }}"
+          
+        elif [ "${{ steps.plan.outputs.has_changes }}" = "false" ]; then
+          echo "✅ SIN CAMBIOS NECESARIOS"
+          echo ""
+          echo "📊 Resultado: Infraestructura actualizada"
+          echo "💡 No se requieren modificaciones"
+          
+        else
+          echo "⚠️ PLAN NO GENERADO"
+          echo ""
+          echo "🔍 Revisa los logs anteriores para ver errores"
+          echo ""
+          echo "📝 Estados:"
+          echo "   • init: ${{ steps.init.outcome }}"
+          echo "   • validate: ${{ steps.validate.outcome }}"
+          echo "   • plan: ${{ steps.plan.outcome }}"
+        fi
+        
+        echo ""
+        echo "========================================"

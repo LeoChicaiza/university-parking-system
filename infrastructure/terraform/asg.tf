@@ -2,10 +2,10 @@
 # SECURITY DOMAIN ASG
 # -------------------------
 resource "aws_autoscaling_group" "security_asg" {
-  name                      = "security-asg-${local.environment}"
-  max_size                  = 2
-  min_size                  = 1
-  desired_capacity          = 1
+  name                = "security-asg-${local.environment}"
+  max_size            = var.asg_max_size
+  min_size            = var.asg_min_size
+  desired_capacity    = var.asg_min_size 
   vpc_zone_identifier = [
   aws_subnet.private_az1.id,
   aws_subnet.private_az2.id
@@ -33,9 +33,9 @@ resource "aws_autoscaling_group" "security_asg" {
 # -------------------------
 resource "aws_autoscaling_group" "vehicle_asg" {
   name                = "vehicle-asg-${local.environment}"
-  max_size            = 2
-  min_size            = 1
-  desired_capacity    = 1
+  max_size            = var.asg_max_size
+  min_size            = var.asg_min_size
+  desired_capacity    = var.asg_min_size
   vpc_zone_identifier = [
   aws_subnet.private_az1.id,
   aws_subnet.private_az2.id
@@ -62,9 +62,9 @@ resource "aws_autoscaling_group" "vehicle_asg" {
 # -------------------------
 resource "aws_autoscaling_group" "parking_asg" {
   name                = "parking-asg-${local.environment}"
-  max_size            = 2
-  min_size            = 1
-  desired_capacity    = 1
+  max_size            = var.asg_max_size
+  min_size            = var.asg_min_size
+  desired_capacity    = var.asg_min_size
   vpc_zone_identifier = [
   aws_subnet.private_az1.id,
   aws_subnet.private_az2.id
@@ -91,9 +91,9 @@ resource "aws_autoscaling_group" "parking_asg" {
 # -------------------------
 resource "aws_autoscaling_group" "access_asg" {
   name                = "access-asg-${local.environment}"
-  max_size            = 2
-  min_size            = 1
-  desired_capacity    = 1
+  max_size            = var.asg_max_size
+  min_size            = var.asg_min_size
+  desired_capacity    = var.asg_min_size
   vpc_zone_identifier = [
   aws_subnet.private_az1.id,
   aws_subnet.private_az2.id
@@ -120,9 +120,9 @@ resource "aws_autoscaling_group" "access_asg" {
 # -------------------------
 resource "aws_autoscaling_group" "billing_asg" {
   name                = "billing-asg-${local.environment}"
-  max_size            = 2
-  min_size            = 1
-  desired_capacity    = 1
+  max_size            = var.asg_max_size
+  min_size            = var.asg_min_size
+  desired_capacity    = var.asg_min_size
   vpc_zone_identifier = [
   aws_subnet.private_az1.id,
   aws_subnet.private_az2.id

@@ -1,4 +1,4 @@
-# environments.tf
+#environments.tf
 locals {
   # Environment basado en el workspace de Terraform
   environment = terraform.workspace
@@ -9,7 +9,7 @@ locals {
     Environment = local.environment
     ManagedBy   = "Terraform"
     Owner       = var.owner != "" ? var.owner : "DevOps"
-    AccountID   = var.account_id != "" ? var.account_id : "506474937999"
+    AccountID   = var.account_id != "" ? var.account_id : "685755358010"
   }
   
   # Prefijo para nombres de recursos

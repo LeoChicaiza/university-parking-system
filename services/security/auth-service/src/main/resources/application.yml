@@ -1,27 +1,38 @@
 server:
-  port: 8081
+  port: 8081  
 
 spring:
   application:
     name: auth-service
+
+  # Redis para cache de tokens
+  data:
+    redis:
+      host: redis
+      port: 6379
+      timeout: 2000ms
+
+  # Para comunicación con User Service
+  web:
+    client:
+      timeout:
+        connect: 5000ms
+        read: 5000ms
+
+# Configuración de JWT (MISMO SECRET que en Gateway)
+jwt:
+  secret: university-parking-system-super-secret-key-256-bits-2026  # 32+ caracteres
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+# Configuración de servicios
+services:
+  user:
+    url: http://user-service:8083  # User Service en 8083
+    base-path: /api/users
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
-
-spring:
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: parking-group
-      auto-offset-reset: earliest
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    consumer:
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-

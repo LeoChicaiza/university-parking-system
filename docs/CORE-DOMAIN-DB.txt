@@ -27,3 +27,19 @@ CREATE TABLE vehicles (
 
 CREATE INDEX idx_vehicle_owner
 ON vehicles(owner_email);
+
+CREATE TABLE parking_lots (
+    id VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    capacity INT NOT NULL,
+    occupied INT NOT NULL
+);
+
+CREATE TABLE parking_spaces (
+    id VARCHAR(50) PRIMARY KEY,
+    lot_id VARCHAR(50) NOT NULL,
+    occupied BOOLEAN NOT NULL
+);
+
+CREATE INDEX idx_space_lot
+ON parking_spaces(lot_id);

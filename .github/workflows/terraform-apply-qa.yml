@@ -1,0 +1,292 @@
+name: 'Terraform Apply - QA Environment'
+
+on:
+  workflow_dispatch:
+    inputs:
+      plan_run_id:
+        description: 'ID del workflow de Plan (ej: 1234567890)'
+        required: true
+        default: ''
+        type: string
+      auto_approve:
+        description: 'Aplicar automáticamente?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-apply:
+    name: 'Terraform Apply - QA'
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+        shell: bash
+    
+    steps:
+    # ========== PASO 1: CHECKOUT ==========
+    - name: Checkout QA Branch
+      uses: actions/checkout@v4
+      with:
+        ref: QA
+        fetch-depth: 0
+    
+    # ========== PASO 2: CONFIGURAR TERRAFORM ==========
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: '1.6.0'
+        terraform_wrapper: false
+    
+    # ========== PASO 3: CONFIGURAR AWS ==========
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v3
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    # ========== PASO 4: VERIFICAR RUN ID ==========
+    - name: Verify Plan Run ID
+      id: verify-run-id
+      run: |
+        echo "=== Verificando Run ID ==="
+        
+        RUN_ID="${{ inputs.plan_run_id }}"
+        
+        if [ -z "$RUN_ID" ]; then
+          echo "❌ ERROR: Debes proporcionar un plan_run_id"
+          echo ""
+          echo "📋 Cómo obtenerlo:"
+          echo "   1. Ve a GitHub Actions"
+          echo "   2. Busca 'Terraform Plan - QA Environment'"
+          echo "   3. Copia el número del run"
+          echo "   4. Ejemplo: 1234567890"
+          exit 1
+        fi
+        
+        # Verificar que sea numérico
+        if ! echo "$RUN_ID" | grep -qE '^[0-9]+$'; then
+          echo "❌ ERROR: El Run ID debe ser numérico"
+          echo "   Recibido: '$RUN_ID'"
+          exit 1
+        fi
+        
+        echo "✅ Run ID válido: $RUN_ID"
+        echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "🔗 Plan original:"
+        echo "   https://github.com/${{ github.repository }}/actions/runs/$RUN_ID"
+    
+    # ========== PASO 5: DESCARGAR ARTIFACT ==========
+    - name: Download Plan Artifact
+      id: download-plan
+      uses: actions/download-artifact@v4
+      with:
+        name: terraform-plan-qa-${{ inputs.plan_run_id }}
+        path: .
+    
+    # ========== PASO 6: VERIFICAR ARCHIVOS ==========
+    - name: Verify Downloaded Files
+      id: verify-files
+      run: |
+        echo "=== Verificando archivos ==="
+        
+        if [ ! -f "tfplan.binary" ]; then
+          echo "❌ ERROR: No se encontró tfplan.binary"
+          echo ""
+          echo "📁 Archivos actuales:"
+          ls -la
+          echo ""
+          echo "🔍 Posibles problemas:"
+          echo "   • Run ID incorrecto"
+          echo "   • Artifact expirado (7 días)"
+          echo "   • El plan no se generó correctamente"
+          exit 1
+        fi
+        
+        echo "✅ Archivos encontrados:"
+        ls -la tfplan.*
+        
+        echo ""
+        echo "📋 Resumen del plan:"
+        echo "-------------------"
+        terraform show tfplan.binary | grep -E "(Plan:|to add|to change|to destroy)" || true
+        echo "-------------------"
+    
+    # ========== PASO 7: INICIALIZAR TERRAFORM ==========
+    - name: Terraform Init
+      id: init
+      run: |
+        echo "=== Inicializando Terraform ==="
+        
+        terraform init -input=false
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Terraform init exitoso"
+        else
+          echo "❌ Terraform init falló"
+          exit 1
+        fi
+    
+    # ========== PASO 8: APLICAR EL PLAN ==========
+    - name: Terraform Apply
+      id: apply
+      run: |
+        echo "========================================"
+        echo "🚀 TERRAFORM APPLY - QA"
+        echo "========================================"
+        echo ""
+        echo "📅 Inicio: $(date)"
+        echo "🆔 Plan Run ID: ${{ inputs.plan_run_id }}"
+        echo "👤 Usuario: ${{ github.actor }}"
+        echo "🔓 Auto-approve: ${{ inputs.auto_approve }}"
+        echo ""
+        
+        if [ "${{ inputs.auto_approve }}" = "false" ]; then
+          echo "⏸️  MODO: REQUIERE CONFIRMACIÓN"
+          echo ""
+          echo "Para aplicar este plan:"
+          echo "   1. Re-ejecuta este workflow"
+          echo "   2. Establece 'auto_approve: true'"
+          echo "   3. Usa el mismo plan_run_id"
+          echo ""
+          echo "📋 Plan completo:"
+          echo "----------------"
+          terraform show tfplan.binary
+          echo "----------------"
+          exit 0
+        fi
+        
+        echo "✅ MODO: AUTO-APPROVE ACTIVADO"
+        echo ""
+        echo "⏰ Aplicando cambios..."
+        
+        terraform apply -input=false -auto-approve tfplan.binary
+        
+        if [ $? -eq 0 ]; then
+          echo ""
+          echo "✅ ✅ ✅ APPLY EXITOSO ✅ ✅ ✅"
+        else
+          echo ""
+          echo "❌ ❌ ❌ APPLY FALLIDO ❌ ❌ ❌"
+          exit 1
+        fi
+        
+        echo ""
+        echo "📅 Fin: $(date)"
+        echo "========================================"
+    
+    # ========== PASO 9: OBTENER OUTPUTS ==========
+    - name: Get Terraform Outputs
+      if: steps.apply.outcome == 'success'
+      id: outputs
+      run: |
+        echo "=== Obteniendo outputs ==="
+        
+        # Guardar outputs
+        terraform output -json > terraform-outputs.json
+        terraform output > terraform-outputs.txt
+        
+        # Extraer valores
+        ALB_DNS=$(terraform output -raw alb_dns 2>/dev/null || echo "No disponible")
+        BASTION_IP=$(terraform output -raw bastion_ip 2>/dev/null || echo "No disponible")
+        
+        echo "alb_dns=$ALB_DNS" >> $GITHUB_OUTPUT
+        echo "bastion_ip=$BASTION_IP" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "📊 Outputs principales:"
+        echo "-----------------------"
+        echo "Load Balancer: $ALB_DNS"
+        echo "Bastion Host:  $BASTION_IP"
+        echo "-----------------------"
+        
+        # Crear resumen
+        echo "# Aplicación completada - QA" > apply-summary.md
+        echo "" >> apply-summary.md
+        echo "**Fecha:** $(date)" >> apply-summary.md
+        echo "**Apply Run ID:** ${{ github.run_id }}" >> apply-summary.md
+        echo "**Plan Run ID:** ${{ inputs.plan_run_id }}" >> apply-summary.md
+        echo "" >> apply-summary.md
+        echo "## Endpoints:" >> apply-summary.md
+        echo "" >> apply-summary.md
+        echo "- **ALB DNS:** \`$ALB_DNS\`" >> apply-summary.md
+        echo "- **Bastion IP:** \`$BASTION_IP\`" >> apply-summary.md
+        echo "" >> apply-summary.md
+        echo "## Comandos:" >> apply-summary.md
+        echo "\`\`\`bash" >> apply-summary.md
+        echo "ssh -i parking-qa-key.pem ec2-user@$BASTION_IP" >> apply-summary.md
+        echo "\`\`\`" >> apply-summary.md
+    
+    # ========== PASO 10: SUBIR RESULTADOS ==========
+    - name: Upload Apply Results
+      if: steps.apply.outcome == 'success'
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-apply-results-${{ github.run_id }}
+        path: |
+          terraform-outputs.json
+          terraform-outputs.txt
+          apply-summary.md
+        retention-days: 30
+    
+    # ========== PASO 11: LIMPIAR ==========
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "=== Limpieza ==="
+        rm -f tfplan.* plan-summary.md 2>/dev/null || true
+        echo "✅ Archivos temporales eliminados"
+    
+    # ========== PASO 12: RESUMEN FINAL ==========
+    - name: Apply Summary
+      if: always()
+      run: |
+        echo ""
+        echo "=========================================="
+        echo "📋 RESUMEN - TERRAFORM APPLY QA"
+        echo "=========================================="
+        echo ""
+        echo "📅 Fecha: $(date)"
+        echo "🆔 Apply Run ID: ${{ github.run_id }}"
+        echo "📋 Plan Run ID: ${{ inputs.plan_run_id }}"
+        echo "👤 Ejecutado por: ${{ github.actor }}"
+        echo ""
+        
+        if [ "${{ steps.apply.outcome }}" = "success" ]; then
+          echo "✅ ✅ ✅ APPLY COMPLETADO ✅ ✅ ✅"
+          echo ""
+          echo "🎉 Infraestructura QA actualizada"
+          echo ""
+          echo "🌐 Endpoints:"
+          echo "   • Load Balancer: ${{ steps.outputs.outputs.alb_dns }}"
+          echo "   • Bastion Host: ${{ steps.outputs.outputs.bastion_ip }}"
+          echo ""
+          echo "📦 Outputs guardados en artifacts"
+          
+        elif [ "${{ inputs.auto_approve }}" = "false" ]; then
+          echo "⏸️  APPLY PAUSADO"
+          echo ""
+          echo "📋 Plan revisado pero no aplicado"
+          echo ""
+          echo "✅ Para aplicar:"
+          echo "   Re-ejecuta con auto_approve: true"
+          
+        else
+          echo "❌ APPLY FALLIDO"
+          echo ""
+          echo "🔍 Revisa los logs para errores"
+        fi
+        
+        echo ""
+        echo "=========================================="

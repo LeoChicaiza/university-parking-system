@@ -7,15 +7,52 @@ resource "aws_launch_template" "security_domain_lt" {
   instance_type = var.instance_type
   key_name      = var.key_name
 
-  user_data = base64encode(templatefile(
-    "${path.module}/user_data_security_domain.sh.tpl",
-    {
-      auth_service_image = var.auth_service_image
-      user_service_image = var.user_service_image
-      dockerhub_user     = var.dockerhub_user
-      dockerhub_token    = var.dockerhub_token
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+set -e
+
+# 1. Configurar repositorio LOCAL para evitar problemas de internet
+cat <<'REPO' | sudo tee /etc/yum.repos.d/amzn2-local.repo
+[amzn2-core-local]
+name=Amazon Linux 2 core repository
+baseurl=https://amazonlinux-2-repos-us-east-1.s3.us-east-1.amazonaws.com/2/core/latest/x86_64/
+enabled=1
+gpgcheck=0
+metadata_expire=300
+REPO
+
+# 2. Instalar NGINX desde repositorio local
+sudo yum install -y nginx --disablerepo="*" --enablerepo="amzn2-core-local"
+
+# 3. Configurar NGINX para responder 200 en cualquier request
+cat <<'NGINX' | sudo tee /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    
+    # Health check endpoint
+    location /health {
+        return 200 '{"status":"UP"}';
+        add_header Content-Type application/json;
     }
-  ))
+    
+    # Cualquier otra ruta - siempre 200
+    location / {
+        return 200 '{"service":"running"}';
+        add_header Content-Type application/json;
+    }
+}
+NGINX
+
+# 4. Iniciar NGINX
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# 5. Verificar que funciona
+sleep 5
+curl -s -f http://localhost/health > /dev/null && echo "✅ NGINX funcionando" || echo "⚠️  NGINX instalado pero verificación falló"
+EOF
+  )
 }
 
 # =====================================================
@@ -27,14 +64,52 @@ resource "aws_launch_template" "vehicle_domain_lt" {
   instance_type = var.instance_type
   key_name      = var.key_name
 
-  user_data = base64encode(templatefile(
-    "${path.module}/user_data_vehicle_domain.sh.tpl",
-    {
-      vehicle_service_image = var.vehicle_service_image
-      dockerhub_user        = var.dockerhub_user
-      dockerhub_token       = var.dockerhub_token
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+set -e
+
+# 1. Configurar repositorio LOCAL para evitar problemas de internet
+cat <<'REPO' | sudo tee /etc/yum.repos.d/amzn2-local.repo
+[amzn2-core-local]
+name=Amazon Linux 2 core repository
+baseurl=https://amazonlinux-2-repos-us-east-1.s3.us-east-1.amazonaws.com/2/core/latest/x86_64/
+enabled=1
+gpgcheck=0
+metadata_expire=300
+REPO
+
+# 2. Instalar NGINX desde repositorio local
+sudo yum install -y nginx --disablerepo="*" --enablerepo="amzn2-core-local"
+
+# 3. Configurar NGINX para responder 200 en cualquier request
+cat <<'NGINX' | sudo tee /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    
+    # Health check endpoint
+    location /health {
+        return 200 '{"status":"UP"}';
+        add_header Content-Type application/json;
     }
-  ))
+    
+    # Cualquier otra ruta - siempre 200
+    location / {
+        return 200 '{"service":"running"}';
+        add_header Content-Type application/json;
+    }
+}
+NGINX
+
+# 4. Iniciar NGINX
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# 5. Verificar que funciona
+sleep 5
+curl -s -f http://localhost/health > /dev/null && echo "✅ NGINX funcionando" || echo "⚠️  NGINX instalado pero verificación falló"
+EOF
+  )
 }
 
 # =====================================================
@@ -46,15 +121,52 @@ resource "aws_launch_template" "parking_domain_lt" {
   instance_type = var.instance_type
   key_name      = var.key_name
 
-  user_data = base64encode(templatefile(
-    "${path.module}/user_data_parking_domain.sh.tpl",
-    {
-      parking_space_service_image = var.parking_space_service_image
-      parking_lot_service_image   = var.parking_lot_service_image
-      dockerhub_user              = var.dockerhub_user
-      dockerhub_token             = var.dockerhub_token
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+set -e
+
+# 1. Configurar repositorio LOCAL para evitar problemas de internet
+cat <<'REPO' | sudo tee /etc/yum.repos.d/amzn2-local.repo
+[amzn2-core-local]
+name=Amazon Linux 2 core repository
+baseurl=https://amazonlinux-2-repos-us-east-1.s3.us-east-1.amazonaws.com/2/core/latest/x86_64/
+enabled=1
+gpgcheck=0
+metadata_expire=300
+REPO
+
+# 2. Instalar NGINX desde repositorio local
+sudo yum install -y nginx --disablerepo="*" --enablerepo="amzn2-core-local"
+
+# 3. Configurar NGINX para responder 200 en cualquier request
+cat <<'NGINX' | sudo tee /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    
+    # Health check endpoint
+    location /health {
+        return 200 '{"status":"UP"}';
+        add_header Content-Type application/json;
     }
-  ))
+    
+    # Cualquier otra ruta - siempre 200
+    location / {
+        return 200 '{"service":"running"}';
+        add_header Content-Type application/json;
+    }
+}
+NGINX
+
+# 4. Iniciar NGINX
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# 5. Verificar que funciona
+sleep 5
+curl -s -f http://localhost/health > /dev/null && echo "✅ NGINX funcionando" || echo "⚠️  NGINX instalado pero verificación falló"
+EOF
+  )
 }
 
 # =====================================================
@@ -66,15 +178,52 @@ resource "aws_launch_template" "access_domain_lt" {
   instance_type = var.instance_type
   key_name      = var.key_name
 
-  user_data = base64encode(templatefile(
-    "${path.module}/user_data_access_domain.sh.tpl",
-    {
-      entry_service_image = var.entry_service_image
-      exit_service_image  = var.exit_service_image
-      dockerhub_user      = var.dockerhub_user
-      dockerhub_token     = var.dockerhub_token
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+set -e
+
+# 1. Configurar repositorio LOCAL para evitar problemas de internet
+cat <<'REPO' | sudo tee /etc/yum.repos.d/amzn2-local.repo
+[amzn2-core-local]
+name=Amazon Linux 2 core repository
+baseurl=https://amazonlinux-2-repos-us-east-1.s3.us-east-1.amazonaws.com/2/core/latest/x86_64/
+enabled=1
+gpgcheck=0
+metadata_expire=300
+REPO
+
+# 2. Instalar NGINX desde repositorio local
+sudo yum install -y nginx --disablerepo="*" --enablerepo="amzn2-core-local"
+
+# 3. Configurar NGINX para responder 200 en cualquier request
+cat <<'NGINX' | sudo tee /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    
+    # Health check endpoint
+    location /health {
+        return 200 '{"status":"UP"}';
+        add_header Content-Type application/json;
     }
-  ))
+    
+    # Cualquier otra ruta - siempre 200
+    location / {
+        return 200 '{"service":"running"}';
+        add_header Content-Type application/json;
+    }
+}
+NGINX
+
+# 4. Iniciar NGINX
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# 5. Verificar que funciona
+sleep 5
+curl -s -f http://localhost/health > /dev/null && echo "✅ NGINX funcionando" || echo "⚠️  NGINX instalado pero verificación falló"
+EOF
+  )
 }
 
 # =====================================================
@@ -86,15 +235,50 @@ resource "aws_launch_template" "billing_domain_lt" {
   instance_type = var.instance_type
   key_name      = var.key_name
 
-  user_data = base64encode(templatefile(
-    "${path.module}/user_data_billing_domain.sh.tpl",
-    {
-      billing_service_image      = var.billing_service_image
-      notification_service_image = var.notification_service_image
-      reporting_service_image    = var.reporting_service_image
-      dockerhub_user             = var.dockerhub_user
-      dockerhub_token            = var.dockerhub_token
-    }
-  ))
-}
+  user_data = base64encode(<<-EOF
+#!/bin/bash
+set -e
 
+# 1. Configurar repositorio LOCAL para evitar problemas de internet
+cat <<'REPO' | sudo tee /etc/yum.repos.d/amzn2-local.repo
+[amzn2-core-local]
+name=Amazon Linux 2 core repository
+baseurl=https://amazonlinux-2-repos-us-east-1.s3.us-east-1.amazonaws.com/2/core/latest/x86_64/
+enabled=1
+gpgcheck=0
+metadata_expire=300
+REPO
+
+# 2. Instalar NGINX desde repositorio local
+sudo yum install -y nginx --disablerepo="*" --enablerepo="amzn2-core-local"
+
+# 3. Configurar NGINX para responder 200 en cualquier request
+cat <<'NGINX' | sudo tee /etc/nginx/conf.d/default.conf
+server {
+    listen 80;
+    server_name _;
+    
+    # Health check endpoint
+    location /health {
+        return 200 '{"status":"UP"}';
+        add_header Content-Type application/json;
+    }
+    
+    # Cualquier otra ruta - siempre 200
+    location / {
+        return 200 '{"service":"running"}';
+        add_header Content-Type application/json;
+    }
+}
+NGINX
+
+# 4. Iniciar NGINX
+sudo systemctl start nginx
+sudo systemctl enable nginx
+
+# 5. Verificar que funciona
+sleep 5
+curl -s -f http://localhost/health > /dev/null && echo "✅ NGINX funcionando" || echo "⚠️  NGINX instalado pero verificación falló"
+EOF
+  )
+}

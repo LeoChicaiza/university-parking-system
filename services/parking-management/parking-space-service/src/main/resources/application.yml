@@ -1,23 +1,9 @@
 server:
-  port: 8083
+  port: 8085
 
 spring:
   application:
     name: parking-space-service
-
-  kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: parking-group
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-    
-  rabbitmq:
-    host: rabbitmq
-    port: 5672
-    username: guest
-    password: guest
 
   datasource:
     url: jdbc:postgresql://postgres-core:5432/core_domain_db
@@ -28,6 +14,20 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: parking-group
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
 
   redis:
     host: redis
